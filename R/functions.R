@@ -302,7 +302,7 @@ plot.viztest <- function(x, ..., ref_lines="none", viz_diff_thresh = .02, make_p
     tmp <- tmp[which(tmp$easy == max(tmp$easy)), ]
     level <- tmp$level
   }
-  w <- which(level == x$tab$level)
+  w <- which(round(level, 10) == round(x$tab$level, 10))
   if(length(w) == 0)stop("level must be one in x$tab$level.\n")
   inp$lwr <- x$L[,w]
   inp$upr <- x$U[,w]
