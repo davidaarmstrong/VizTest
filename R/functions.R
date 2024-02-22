@@ -206,7 +206,7 @@ print.viztest <- function(x, ..., best=TRUE, missed_tests=TRUE, level=NULL){
       tmp <- tmp[which(tmp$easy == max(tmp$easy)), ]
       level <- tmp[1, "level"]
     }
-    w <- which(round(x$tab$level, 10) == level)
+    w <- which(round(x$tab$level, 10) == round(level, 10))
     mt <- data.frame(bigger = x$param_names[x$combs[1,]],
                      smaller = x$param_names[x$combs[2,]],
                      pw_test = ifelse(x$pw_test, "Sig", "Insig"),
