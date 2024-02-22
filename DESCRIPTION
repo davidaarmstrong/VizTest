@@ -7,6 +7,7 @@ Authors@R:
     person("William", "Poirier", , "wpoirier@uwo.ca", role = c("aut"),
            comment = c(ORCID = "0000-0002-3274-1351")))
 Description: The main function in the pacakge identifies the optimal confidence interval to represent the results of a set of pairwise tests.  
+Depends: dplyr, ggplot2
 License: MIT + file LICENSE
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
