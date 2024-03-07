@@ -262,7 +262,7 @@ make_segs <- function(.data, vdt = .02, ...){
   segs <- NULL
   for(i in 1:nrow(.data)){
     if(any(.data$lwr[i:nrow(.data)] < .data$upr[i])){
-      segs <- rbind(segs, data.frame(stim_start=i, stim_end=(i-1) + max(which(.data$lwr[i:nrow(.data)] < .data$upr[i])), bound_start=.data$upr[i], bound_end=.data$upr[i]))
+      segs <- rbind(segs, data.frame(stim_start=i, stim_end=(i-1) + max(which(.data$lwr[i:nrow(.data)] <= .data$upr[i])), bound_start=.data$upr[i], bound_end=.data$upr[i]))
     }
   }
   rg <- max(.data$upr, na.rm=TRUE) - min(.data$lwr, na.rm=TRUE)
@@ -307,6 +307,7 @@ plot.viztest <- function(x, ..., ref_lines="none", viz_diff_thresh = .02, make_p
   inp$lwr <- x$L[,w]
   inp$upr <- x$U[,w]
   inp <- inp %>% arrange(est)
+  inp <- inp %>% filter(vbl != "zero")
   segs <- make_segs(inp, vdt=viz_diff_thresh)
   segs$vbl <- rownames(segs)
   inp$label <- factor(1:nrow(inp), labels=inp$vbl)
