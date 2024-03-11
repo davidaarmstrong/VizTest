@@ -257,6 +257,7 @@ vcov.vtcustom <- function(object, ...){
 #' @param vdt Visual difficulty threshold, see the details of `help(plot.viztest)` for an explanation of the parameter. 
 #' @param ... Other arguments to be passed down.  Currently not implemented. 
 #' @returns A data frame with variables `stim_start` and `stim_end` identifying the starting and ending stimuli for the segments as well as `bound_start` and `bound_end` which give the relevant value of the reference bound.  There is also a variable called `ambiguous` which indicates if any comparisons with that bound are ambiguous.
+#' @importFrom dplyr filter
 #' @export
 make_segs <- function(.data, vdt = .02, ...){
   segs <- NULL
