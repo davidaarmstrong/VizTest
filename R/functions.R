@@ -296,7 +296,7 @@ make_segs <- function(.data, vdt = .02, ...){
 #' @importFrom dplyr left_join arrange `%>%` join_by
 #' @importFrom ggplot2 ggplot geom_pointrange geom_segment aes
 #' @export
-plot.viztest <- function(x, ..., ref_lines="none", viz_diff_thresh = .02, make_plot=TRUE, level=NULL){
+plot.viztest <- function(x, ..., ref_lines="none", viz_diff_thresh = .02, make_plot=TRUE, level=NULL,trans=I){
   inp <- x$est
   if(is.null(level)){
     tmp <- x$tab[which(x$tab$psame == max(x$tab$psame)), ]
@@ -309,6 +309,7 @@ plot.viztest <- function(x, ..., ref_lines="none", viz_diff_thresh = .02, make_p
   inp$upr <- x$U[,w]
   inp <- inp %>% arrange(est)
   inp <- inp %>% filter(vbl != "zero")
+  inp[2:5] <- apply(inp[2:5],2,trans)
   segs <- make_segs(inp, vdt=viz_diff_thresh)
   segs$vbl <- rownames(segs)
   inp$label <- factor(1:nrow(inp), labels=inp$vbl)
