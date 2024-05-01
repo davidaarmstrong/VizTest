@@ -10,7 +10,8 @@
   ref_lines = "none",
   viz_diff_thresh = 0.02,
   make_plot = TRUE,
-  level = NULL
+  level = NULL,
+  trans = I
 )
 }
 \arguments{
@@ -25,6 +26,8 @@
 \item{make_plot}{Logical indicating whether the plot should be constructed or the data returned.}
 
 \item{level}{Level at which to plot the estimates.  If \code{NULL} (the default) the easiest optimal level will be chosen.}
+
+\item{trans}{A function to transform the estimates and their confidence intervals like \code{plogis}.}
 }
 \description{
 Plots the output of viztest objects with optional reference lines

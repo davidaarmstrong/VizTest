@@ -190,49 +190,36 @@ viztest.vtsim <- function(obj,
 #' @param missed_tests Logical indicating whether the tests not represented by the optimal visual testing intervals should be displayed
 #' @param level Which level should be used as the optimal one.  If `NULL`, the easiest optimal level will be used.  Easiness is measured by the sum of the overlap
 #' in confidence intervals for insignificant tests plus the distance between the lower and upper bound for tests that are significant.
-#' @param trans A function to transform the estimates and their confidence intervals like `plogis`.
 #' @param ... Other arguments, currently not implemented.
 #' @export
 #' @method print viztest
-plot.viztest <- function(x, ..., ref_lines="none", viz_diff_thresh = .02, make_plot=TRUE, level=NULL,trans=I){
-  inp <- x$est
-  if(is.null(level)){
-    tmp <- x$tab[which(x$tab$psame == max(x$tab$psame)), ]
-    tmp <- tmp[which(tmp$easy == max(tmp$easy)), ]
-    level <- tmp$level
-  }
-  w <- which(round(level, 10) == round(x$tab$level, 10))
-  if(length(w) == 0)stop("level must be one in x$tab$level.\n")
-  inp$lwr <- x$L[,w]
-  inp$upr <- x$U[,w]
-  inp <- inp %>% arrange(est)
-  inp <- inp %>% filter(vbl != "zero")
-  segs <- make_segs(inp, vdt=viz_diff_thresh)
-  segs$vbl <- rownames(segs)
-  inp$label <- factor(1:nrow(inp), labels=inp$vbl)
-  inp <- left_join(inp, segs, by=join_by(vbl))
-  cols <- c("est","se","lwr","upr","bound_start","bound_end")
-  inp[,cols] <- apply(inp[,cols],2,trans)
-  if(any(inp$vbl == "zero"))inp <- inp[-which(inp$vbl == "zero"), ]
-  if(!make_plot){
-    res <- inp
+print.viztest <- function(x, ..., best=TRUE, missed_tests=TRUE, level=NULL){
+  cat("\nCorrespondents of PW Tests with CI Tests\n")
+  if(best){
+    print(x$tab[which(x$tab$psame == max(x$tab$psame)), ])
   }else{
-    g <- ggplot(inp) + 
-      geom_pointrange(aes(x=est, xmin = lwr, xmax=upr, y=label), size=.01) 
-    if("all" %in% ref_lines){
-      g <- g + geom_segment(aes(x=bound_start, xend=bound_end, y=stim_start, yend=stim_end), color="gray75", linetype=3)
-    }  
-    if( "ambiguous" %in% ref_lines){
-      g <- g + geom_segment(data = inp[which(inp$ambiguous), ], aes(x=bound_start, xend=bound_end, y=stim_start, yend=stim_end), color="gray75", linetype=3)
-    }
-    if(!any(c("ambiguous", "all", "none") %in% ref_lines)){
-      incl <- which(ref_lines %in% inp$vbl)
-      if(length(incl) == 0)stop("ref_lines should either be one of (all, ambiguous, or none) or a vector of names consistent with x$est$vbl.\n")
-      g <- g + geom_segment(data = inp[incl, ], aes(x=bound_start, xend=bound_end, y=stim_start, yend=stim_end), color="gray75", linetype=3)
-    }
-    res <- g
+    print(x$tab)
   }
-  return(res)
+  if(missed_tests){
+    if(is.null(level)){
+      tmp <- x$tab[which(x$tab$psame == max(x$tab$psame)), ]
+      tmp <- tmp[which(tmp$easy == max(tmp$easy)), ]
+      level <- tmp[1, "level"]
+    }
+    w <- which(round(x$tab$level, 10) == round(level, 10))
+    mt <- data.frame(bigger = x$param_names[x$combs[1,]],
+                     smaller = x$param_names[x$combs[2,]],
+                     pw_test = ifelse(x$pw_test, "Sig", "Insig"),
+                     ci_olap = ifelse(x$ci_tests[,w], "No", "Yes"))
+    w2 <- which((mt$pw_test == "Sig" & mt$ci_olap == "Yes") |
+                  (mt$pw_test == "Insig" & mt$ci_olap == "No"))
+    if(length(w2) > 0){
+      cat("\nMissed Tests (n=", length(w2), " of ", length(x$pw_test), ")\n", sep="")
+      print(mt[w2, ])
+    }else{
+      cat("\nAll ", length(x$pw_test), " tests properly represented for by CI overlaps.\n")
+    }
+  }
 }
 
 #'Coefficient Method for vtcustom Objects.
@@ -299,6 +286,7 @@ make_segs <- function(.data, vdt = .02, ...){
 #' @param viz_diff_thresh Threshold for identifying visual difficulty, see details. 
 #' @param make_plot Logical indicating whether the plot should be constructed or the data returned. 
 #' @param level Level at which to plot the estimates.  If `NULL` (the default) the easiest optimal level will be chosen.  
+#' @param trans A function to transform the estimates and their confidence intervals like `plogis`.
 #' @param ... Other arguments passed down.  Currently not implemented.
 #' @details The `ref_lines` argument identifies what reference lines will be plotted in the figure.  For any particular stimulus, the reference lines run along the upper bound of the stimulus from the stimulus location to the most distant stimulus with overlapping confidence intervals.  
 #' When `ref_lines = "all"`, all lines are plotted, though in displays with many stimuli, this can make for a messy graph.  When `"ref_lines = ambiguous"` is specified, then only the ones that help discriminate in cases where the result might be visually difficult to discern are plotted. 
@@ -322,11 +310,12 @@ plot.viztest <- function(x, ..., ref_lines="none", viz_diff_thresh = .02, make_p
   inp$upr <- x$U[,w]
   inp <- inp %>% arrange(est)
   inp <- inp %>% filter(vbl != "zero")
-  inp[2:5] <- apply(inp[2:5],2,trans)
   segs <- make_segs(inp, vdt=viz_diff_thresh)
   segs$vbl <- rownames(segs)
   inp$label <- factor(1:nrow(inp), labels=inp$vbl)
   inp <- left_join(inp, segs, by=join_by(vbl))
+  cols <- c("est","se","lwr","upr","bound_start","bound_end")
+  inp[,cols] <- apply(inp[,cols],2,trans)
   if(any(inp$vbl == "zero"))inp <- inp[-which(inp$vbl == "zero"), ]
   if(!make_plot){
     res <- inp
