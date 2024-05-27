@@ -286,6 +286,7 @@ make_segs <- function(.data, vdt = .02, ...){
 #' @param viz_diff_thresh Threshold for identifying visual difficulty, see details. 
 #' @param make_plot Logical indicating whether the plot should be constructed or the data returned. 
 #' @param level Level at which to plot the estimates.  If `NULL` (the default) the easiest optimal level will be chosen.  
+#' @param trans A function to transform the estimates and their confidence intervals like `plogis`.
 #' @param ... Other arguments passed down.  Currently not implemented.
 #' @details The `ref_lines` argument identifies what reference lines will be plotted in the figure.  For any particular stimulus, the reference lines run along the upper bound of the stimulus from the stimulus location to the most distant stimulus with overlapping confidence intervals.  
 #' When `ref_lines = "all"`, all lines are plotted, though in displays with many stimuli, this can make for a messy graph.  When `"ref_lines = ambiguous"` is specified, then only the ones that help discriminate in cases where the result might be visually difficult to discern are plotted. 
@@ -309,11 +310,12 @@ plot.viztest <- function(x, ..., ref_lines="none", viz_diff_thresh = .02, make_p
   inp$upr <- x$U[,w]
   inp <- inp %>% arrange(est)
   inp <- inp %>% filter(vbl != "zero")
-  inp[2:5] <- apply(inp[2:5],2,trans)
   segs <- make_segs(inp, vdt=viz_diff_thresh)
   segs$vbl <- rownames(segs)
   inp$label <- factor(1:nrow(inp), labels=inp$vbl)
   inp <- left_join(inp, segs, by=join_by(vbl))
+  cols <- c("est","se","lwr","upr","bound_start","bound_end")
+  inp[,cols] <- apply(inp[,cols],2,trans)
   if(any(inp$vbl == "zero"))inp <- inp[-which(inp$vbl == "zero"), ]
   if(!make_plot){
     res <- inp
