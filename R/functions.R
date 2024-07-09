@@ -272,6 +272,7 @@ make_segs <- function(.data, vdt = .02, ...){
   for(i in 1:(nrow(segs)-1)){
     if(any(abs(.data$lwr[(segs$stim_start[i]+1):nrow(.data)] - segs$bound_start[i]) < amb_thresh)){
       segs$ambiguous[i] <- TRUE
+      segs$stim_end[i] <- max(which((abs(.data$lwr[(segs$stim_start[i]+1):nrow(.data)] - segs$bound_start[i]) < amb_thresh)==T))+i
     }
   } 
   segs
