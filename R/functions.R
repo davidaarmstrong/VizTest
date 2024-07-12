@@ -286,7 +286,7 @@ make_segs <- function(.data, vdt = .02, ...){
 #' @param ref_lines Reference lines to be plotted - one of "all", "ambiguous", "none".  This could also be a vector of stimulus names to plot - they should be the same as the names of the estimates in `x$est`. See details for explanation. 
 #' @param viz_diff_thresh Threshold for identifying visual difficulty, see details. 
 #' @param make_plot Logical indicating whether the plot should be constructed or the data returned. 
-#' @param level Level at which to plot the estimates.  If `NULL` (the default) the easiest optimal level will be chosen.  
+#' @param level Level at which to plot the estimates.  Accepts both numeric entries or one of "ce", "max", "min", "median" - defaults to "ce", the cognitively easiest level.  
 #' @param trans A function to transform the estimates and their confidence intervals like `plogis`.
 #' @param ... Other arguments passed down.  Currently not implemented.
 #' @details The `ref_lines` argument identifies what reference lines will be plotted in the figure.  For any particular stimulus, the reference lines run along the upper bound of the stimulus from the stimulus location to the most distant stimulus with overlapping confidence intervals.  
@@ -298,15 +298,20 @@ make_segs <- function(.data, vdt = .02, ...){
 #' @importFrom dplyr left_join arrange `%>%` join_by
 #' @importFrom ggplot2 ggplot geom_pointrange geom_segment aes
 #' @export
-plot.viztest <- function(x, ..., ref_lines="none", viz_diff_thresh = .02, make_plot=TRUE, level=NULL,trans=I){
+plot.viztest <- function(x, ..., ref_lines="none", viz_diff_thresh = .02, make_plot=TRUE, level=c("ce","max","min","median"),trans=I){
   inp <- x$est
-  if(is.null(level)){
-    tmp <- x$tab[which(x$tab$psame == max(x$tab$psame)), ]
-    tmp <- tmp[which(tmp$easy == max(tmp$easy)), ]
-    level <- tmp$level
+  tmp <- x$tab[which(x$tab$psame == max(x$tab$psame)), ]
+  if(!is.numeric(level)){
+    lvl <- match.arg(level)
+    level <- switch(lvl,
+                    "ce" = tmp[which(tmp$easy == max(tmp$easy)), ]$level,
+                    "max" = tmp[which(tmp$level == max(tmp$level)), ]$level,
+                    "min" = tmp[which(tmp$level == min(tmp$level)), ]$level,
+                    "median" = tmp[which(round(tmp$level,2) == round(median(tmp$level),2)), ]$level)
   }
   w <- which(round(level, 10) == round(x$tab$level, 10))
-  if(length(w) == 0)stop("level must be one in x$tab$level.\n")
+  if(length(w) == 0)stop("level must be one in x$tab$level or one of ce, max, min, or median.\n")
+  if(!(level %in% tmp$level))warning("chosen level outside of range of maximally representing CI overlaps. Visual tests may not be faithfull to pairwise test results!!!")
   inp$lwr <- x$L[,w]
   inp$upr <- x$U[,w]
   inp <- inp %>% arrange(est)

@@ -10,7 +10,7 @@
   ref_lines = "none",
   viz_diff_thresh = 0.02,
   make_plot = TRUE,
-  level = NULL,
+  level = c("ce", "max", "min", "median"),
   trans = I
 )
 }
@@ -25,7 +25,7 @@
 
 \item{make_plot}{Logical indicating whether the plot should be constructed or the data returned.}
 
-\item{level}{Level at which to plot the estimates.  If \code{NULL} (the default) the easiest optimal level will be chosen.}
+\item{level}{Level at which to plot the estimates.  Accepts both numeric entries or one of "ce", "max", "min", "median" - defaults to "ce", the cognitively easiest level.}
 
 \item{trans}{A function to transform the estimates and their confidence intervals like \code{plogis}.}
 }
