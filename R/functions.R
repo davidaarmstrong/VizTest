@@ -41,7 +41,7 @@ viztest <- function(obj,
 #' as the threshold in the calculation of "easiness".
 #' @param ... Other arguments, currently not implemented.
 #' @method viztest default
-#' @importFrom dplyr tibble
+#' @importFrom dplyr tibble bind_rows
 #' @export
 viztest.default <- function(obj,
                      test_level = 0.05,
@@ -89,11 +89,29 @@ viztest.default <- function(obj,
   thresh <- easy_thresh*delta
   s_star <- L[combs[1,], ] >= U[combs[2,], ]
   smat <- array(s, dim=dim(s_star))
-  easiness <- sapply(1:ncol(L), \(m){
-    e <- ifelse(s, L[combs[1,],m] - U[combs[2,],m], U[combs[2,],m] - L[combs[1,],m])
-    e <- ifelse(abs(e) > thresh[m], sign(e)*thresh[m], e)
-    sum(e)
-  } )
+  if("zero" %in% rownames(L)){
+    w <- which(rownames(L) == "zero")
+    new_L <- L[-w, ]
+    new_U <- U[-w, ]
+    out <- which(combs[1,] == w | combs[2,] == w)
+    new_combs <- combs[, -out]
+    new_combs[which(new_combs > w, arr.ind = TRUE)] <- new_combs[which(new_combs > w, arr.ind = TRUE)] - 1
+    new_s <- s[-out]
+  }else{
+    new_L <- L
+    new_U <- U
+    new_combs <- combs
+    new_s <- s
+  }
+  diff_sig <- new_L[new_combs[1,new_s],, drop=FALSE] - new_U[new_combs[2,new_s],, drop=FALSE]
+  diff_insig <- new_U[new_combs[2,!new_s],, drop=FALSE] - new_L[new_combs[1,!new_s],, drop=FALSE]
+  diff_sig[which(diff_sig <= 0, arr.ind=TRUE)] <- NA
+  diff_insig[which(diff_insig <= 0, arr.ind=TRUE)] <- NA
+  d_sig <- suppressWarnings(apply(diff_sig, 2, min, na.rm=TRUE))
+  d_insig <- suppressWarnings(apply(diff_insig, 2, min, na.rm=TRUE))
+  d_sig <- ifelse(is.finite(d_sig), d_sig, 0)
+  d_insig <- ifelse(is.finite(d_insig), d_insig, 0)
+  easiness <- d_sig*d_insig
   res <- data.frame(level = lev_seq,
                     psame = apply(s_star, 2, \(x)mean(x == s)),
                     pdiff = mean(s),
@@ -195,29 +213,95 @@ viztest.vtsim <- function(obj,
 #' @method print viztest
 print.viztest <- function(x, ..., best=TRUE, missed_tests=TRUE, level=NULL){
   cat("\nCorrespondents of PW Tests with CI Tests\n")
+  tmp <- x$tab[which(x$tab$psame == max(x$tab$psame)), ]
+  lowest <- tmp[1,]
+  highest <- tmp[nrow(tmp), ]
+  middle <- tmp[floor(median(1:nrow(tmp))), ]
+  easiest <- tmp[which.max(tmp$easy), ]
+  b_levs <- bind_rows(lowest, middle, highest, easiest) %>% 
+    mutate(method = c("Lowest", "Middle", "Highest", "Easiest"))
   if(best){
-    print(x$tab[which(x$tab$psame == max(x$tab$psame)), ])
+    print(b_levs)
   }else{
     print(x$tab)
   }
   if(missed_tests){
     if(is.null(level)){
-      tmp <- x$tab[which(x$tab$psame == max(x$tab$psame)), ]
-      tmp <- tmp[which(tmp$easy == max(tmp$easy)), ]
-      level <- tmp[1, "level"]
-    }
-    w <- which(round(x$tab$level, 10) == round(level, 10))
-    mt <- data.frame(bigger = x$param_names[x$combs[1,]],
-                     smaller = x$param_names[x$combs[2,]],
-                     pw_test = ifelse(x$pw_test, "Sig", "Insig"),
-                     ci_olap = ifelse(x$ci_tests[,w], "No", "Yes"))
-    w2 <- which((mt$pw_test == "Sig" & mt$ci_olap == "Yes") |
-                  (mt$pw_test == "Insig" & mt$ci_olap == "No"))
-    if(length(w2) > 0){
-      cat("\nMissed Tests (n=", length(w2), " of ", length(x$pw_test), ")\n", sep="")
-      print(mt[w2, ])
+      ## missed tests for lowest level
+      l1 <- b_levs$level[1]
+      w11 <- which(round(x$tab$level, 10) == round(l1, 10))
+      mt1 <- data.frame(bigger = x$param_names[x$combs[1,]],
+                       smaller = x$param_names[x$combs[2,]],
+                       pw_test = ifelse(x$pw_test, "Sig", "Insig"),
+                       ci_olap = ifelse(x$ci_tests[,w11], "No", "Yes"))
+      w21 <- which((mt1$pw_test == "Sig" & mt1$ci_olap == "Yes") |
+                    (mt1$pw_test == "Insig" & mt1$ci_olap == "No"))
+      
+      if(length(w21) > 0){
+        cat("\nMissed Tests for Lowest Level (n=", length(w21), " of ", length(x$pw_test), ")\n", sep="")
+        print(mt1[w21, ])
+      }
+      
+      ## missed tests for middle level
+      l2 <- b_levs$level[2]
+      w12 <- which(round(x$tab$level, 10) == round(l2, 10))
+      mt2 <- data.frame(bigger = x$param_names[x$combs[1,]],
+                        smaller = x$param_names[x$combs[2,]],
+                        pw_test = ifelse(x$pw_test, "Sig", "Insig"),
+                        ci_olap = ifelse(x$ci_tests[,w12], "No", "Yes"))
+      w22 <- which((mt2$pw_test == "Sig" & mt2$ci_olap == "Yes") |
+                     (mt2$pw_test == "Insig" & mt2$ci_olap == "No"))
+      if(length(w22) > 0){
+        cat("\nMissed Tests for Lowest Level (n=", length(w22), " of ", length(x$pw_test), ")\n", sep="")
+        print(mt2[w22, ])
+      }
+      
+      ## missed tests for highest level
+      l3 <- b_levs$level[3]
+      w13 <- which(round(x$tab$level, 10) == round(l3, 10))
+      mt3 <- data.frame(bigger = x$param_names[x$combs[1,]],
+                        smaller = x$param_names[x$combs[2,]],
+                        pw_test = ifelse(x$pw_test, "Sig", "Insig"),
+                        ci_olap = ifelse(x$ci_tests[,w13], "No", "Yes"))
+      w23 <- which((mt3$pw_test == "Sig" & mt3$ci_olap == "Yes") |
+                     (mt3$pw_test == "Insig" & mt3$ci_olap == "No"))
+      if(length(w23) > 0){
+        cat("\nMissed Tests for Lowest Level (n=", length(w23), " of ", length(x$pw_test), ")\n", sep="")
+        print(mt3[w23, ])
+      }
+      
+      ## missed tests for easiest level
+      l4 <- b_levs$level[4]
+      w14 <- which(round(x$tab$level, 10) == round(l4, 10))
+      mt4 <- data.frame(bigger = x$param_names[x$combs[1,]],
+                        smaller = x$param_names[x$combs[2,]],
+                        pw_test = ifelse(x$pw_test, "Sig", "Insig"),
+                        ci_olap = ifelse(x$ci_tests[,w14], "No", "Yes"))
+      w24 <- which((mt4$pw_test == "Sig" & mt4$ci_olap == "Yes") |
+                     (mt4$pw_test == "Insig" & mt4$ci_olap == "No"))
+            tmp <- x$tab[which(x$tab$psame == max(x$tab$psame)), ]
+      
+      if(length(w24) > 0){
+        cat("\nMissed Tests for Lowest Level (n=", length(w24), " of ", length(x$pw_test), ")\n", sep="")
+        print(mt4[w24, ])
+      }
+      if(length(w21) == 0){
+        cat("\nAll ", length(x$pw_test), " tests properly represented for by CI overlaps.\n")
+      }
     }else{
-      cat("\nAll ", length(x$pw_test), " tests properly represented for by CI overlaps.\n")
+      w <- which(round(x$tab$level, 10) == round(level, 10))
+      mt <- data.frame(bigger = x$param_names[x$combs[1,]],
+                       smaller = x$param_names[x$combs[2,]],
+                       pw_test = ifelse(x$pw_test, "Sig", "Insig"),
+                       ci_olap = ifelse(x$ci_tests[,w], "No", "Yes"))
+      w2 <- which((mt$pw_test == "Sig" & mt$ci_olap == "Yes") |
+                    (mt$pw_test == "Insig" & mt$ci_olap == "No"))
+      if(length(w2) > 0){
+        cat("\nMissed Tests (n=", length(w2), " of ", length(x$pw_test), ")\n", sep="")
+        print(mt[w2, ])
+      }else{
+        cat("\nAll ", length(x$pw_test), " tests properly represented for by CI overlaps.\n")
+      }
     }
   }
 }
