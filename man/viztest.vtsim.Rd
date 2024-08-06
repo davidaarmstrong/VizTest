@@ -10,6 +10,7 @@
   range_levels = c(0.25, 0.99),
   level_increment = 0.01,
   adjust = c("none", "holm", "hochberg", "hommel", "bonferroni", "BH", "BY", "fdr"),
+  cifun = c("quantile", "hdi"),
   include_intercept = FALSE,
   include_zero = TRUE,
   easy_thresh = 0.05,
@@ -27,12 +28,11 @@
 
 \item{adjust}{Multiplicity adjustment to use when calculating the p-values for the pairwise tests.}
 
+\item{cifun}{For simulation results, the method used to calculate the confidence/credible interval either "quantile" (default) or "hdi" for highest density region.}
+
 \item{include_intercept}{Logical indicating whether the intercept should be included in the tests, defaults to \code{FALSE}.}
 
 \item{include_zero}{Should univariate tests at zero be included, defaults to \code{TRUE}.}
-
-\item{easy_thresh}{Proportion of distance between the biggest upper bound and the smallest lower bound to use
-as the threshold in the calculation of "easiness".}
 
 \item{...}{Other arguments, currently not implemented.}
 }

@@ -1,3 +1,5 @@
+## TODO: fix simulation method to take quantile (credible interval) or HPD to calculate the overlaps. 
+
 globalVariables(c("bound_end", "bound_start", "est", "label", "lwr", "stim_end", "stim_start", "upr", "vbl"))
 
 #' Calculate Correspondence Between Pairwise Test and CI Overlaps
@@ -6,25 +8,24 @@ globalVariables(c("bound_end", "bound_start", "est", "label", "lwr", "stim_end",
 #' @param test_level The type I error rate of the pairwise tests.
 #' @param range_levels The range of confidence levels to try.
 #' @param level_increment Step size of increase between the values of `range_levels`.
-#' @param adjust Multiplicity adjustment to use when calculating the p-values for the pairwise tests.
+#' @param adjust Multiplicity adjustment to use when calculating the p-values for normal theory pairwise tests.
+#' @param cifun For simulation results, the method used to calculate the confidence/credible interval either "quantile" (default) or "hdi" for highest density region. 
 #' @param include_intercept Logical indicating whether the intercept should be included in the tests, defaults to `FALSE`.
 #' @param include_zero Should univariate tests at zero be included, defaults to `TRUE`.
-#' @param easy_thresh Proportion of distance between the biggest upper bound and the smallest lower bound to use
-#' as the threshold in the calculation of "easiness".
 #' @param ... Other arguments, currently not implemented.
 #' @export
 #' @importFrom stats coef vcov qt pt p.adjust
 #' @importFrom utils combn
 #'
 viztest <- function(obj,
-                            test_level = 0.05,
-                            range_levels = c(.25, .99),
-                            level_increment = 0.01,
-                            adjust = c("none", "holm", "hochberg", "hommel", "bonferroni", "BH", "BY", "fdr"),
-                            include_intercept = FALSE,
-                            include_zero = TRUE,
-                            easy_thresh=.05,
-                            ...){
+                    test_level = 0.05,
+                    range_levels = c(.25, .99),
+                    level_increment = 0.01,
+                    adjust = c("none", "holm", "hochberg", "hommel", "bonferroni", "BH", "BY", "fdr"),
+                    cifun = c("quantile", "hdi"), 
+                    include_intercept = FALSE,
+                    include_zero = TRUE,
+                    ...){
   UseMethod("viztest")
 }
 
@@ -37,8 +38,6 @@ viztest <- function(obj,
 #' @param adjust Multiplicity adjustment to use when calculating the p-values for the pairwise tests.
 #' @param include_intercept Logical indicating whether the intercept should be included in the tests, defaults to `FALSE`.
 #' @param include_zero Should univariate tests at zero be included, defaults to `TRUE`.
-#' @param easy_thresh Proportion of distance between the biggest upper bound and the smallest lower bound to use
-#' as the threshold in the calculation of "easiness".
 #' @param ... Other arguments, currently not implemented.
 #' @method viztest default
 #' @importFrom dplyr tibble bind_rows
@@ -50,7 +49,6 @@ viztest.default <- function(obj,
                      adjust = c("none", "holm", "hochberg", "hommel", "bonferroni", "BH", "BY", "fdr"),
                      include_intercept = FALSE,
                      include_zero = TRUE,
-                     easy_thresh=.05,
                      ...){
   adj <- match.arg(adjust)
   lev_seq <- seq(range_levels[1], range_levels[2], by=level_increment)
@@ -85,8 +83,6 @@ viztest.default <- function(obj,
   s <- p_diff < test_level
   L <- sapply(lev_seq, \(l)bhat - qt(1-(1-l)/2, resdf)*sqrt(diag(V)))
   U <- sapply(lev_seq, \(l)bhat + qt(1-(1-l)/2, resdf)*sqrt(diag(V)))
-  delta <- apply(U, 2, max) - apply(L, 2, min)
-  thresh <- easy_thresh*delta
   s_star <- L[combs[1,], ] >= U[combs[2,], ]
   smat <- array(s, dim=dim(s_star))
   if("zero" %in% rownames(L)){
@@ -124,7 +120,6 @@ viztest.default <- function(obj,
               ci_tests = s_star,
               combs = combs,
               param_names = names(bhat),
-              thresh = thresh,
               L = L,
               U = U, 
               est = est_data)
@@ -138,12 +133,12 @@ viztest.default <- function(obj,
 #' @param range_levels The range of confidence levels to try.
 #' @param level_increment Step size of increase between the values of `range_levels`.
 #' @param adjust Multiplicity adjustment to use when calculating the p-values for the pairwise tests.
+#' @param cifun For simulation results, the method used to calculate the confidence/credible interval either "quantile" (default) or "hdi" for highest density region. 
 #' @param include_intercept Logical indicating whether the intercept should be included in the tests, defaults to `FALSE`.
 #' @param include_zero Should univariate tests at zero be included, defaults to `TRUE`.
-#' @param easy_thresh Proportion of distance between the biggest upper bound and the smallest lower bound to use
-#' as the threshold in the calculation of "easiness".
 #' @param ... Other arguments, currently not implemented.
 #' @importFrom stats quantile
+#' @importFrom HDInterval hdi
 #' @method viztest vtsim
 #' @export
 viztest.vtsim <- function(obj,
@@ -151,10 +146,11 @@ viztest.vtsim <- function(obj,
                           range_levels = c(.25, .99),
                           level_increment = 0.01,
                           adjust = c("none", "holm", "hochberg", "hommel", "bonferroni", "BH", "BY", "fdr"),
+                          cifun = c("quantile", "hdi"), 
                           include_intercept = FALSE,
                           include_zero = TRUE,
-                          easy_thresh=.05,
                           ...){
+  cif <- match.arg(cifun)
   est <- obj$est
   if(include_zero){
     est <- cbind(est, zero=rep(0, nrow(est)))
@@ -171,17 +167,39 @@ viztest.vtsim <- function(obj,
   pvals <- ifelse(pvals > .5, 1-pvals, pvals)
   s <- pvals < test_level
   lev_seq <- seq(range_levels[1], range_levels[2], by=level_increment)
-  L <- sapply(lev_seq, \(l)apply(est, 2, quantile, probs=((1-l)/2)))
-  U <- sapply(lev_seq, \(l)apply(est, 2, quantile, probs=(1-(1-l)/2)))
-  delta <- apply(U, 2, max) - apply(L, 2, min)
-  thresh <- easy_thresh*delta
+  if(cif == "quantile"){
+    L <- sapply(lev_seq, \(l)apply(est, 2, quantile, probs=((1-l)/2)))
+    U <- sapply(lev_seq, \(l)apply(est, 2, quantile, probs=(1-(1-l)/2)))
+  }else{
+    LU <- lapply(lev_seq, \(l)apply(est, 2, hdi, credMass = l))
+    L <- sapply(LU, \(x)x[1,])
+    U <- sapply(LU, \(x)x[2,])
+  }
   s_star <- L[combs[1,], ] >= U[combs[2,], ]
   smat <- array(s, dim=dim(s_star))
-  easiness <- sapply(1:ncol(L), \(m){
-    e <- ifelse(s, L[combs[1,],m] - U[combs[2,],m], U[combs[2,],m] - L[combs[1,],m])
-    e <- ifelse(abs(e) > thresh[m], sign(e)*thresh[m], e)
-    sum(e)
-  } )
+  if(include_zero){
+    w <- which(apply(est, 2, \(x)all(x == 0)))
+    new_L <- L[-w, ]
+    new_U <- U[-w, ]
+    out <- which(combs[1,] == w | combs[2,] == w)
+    new_combs <- combs[, -out]
+    new_combs[which(new_combs > w, arr.ind = TRUE)] <- new_combs[which(new_combs > w, arr.ind = TRUE)] - 1
+    new_s <- s[-out]
+  }else{
+    new_L <- L
+    new_U <- U
+    new_combs <- combs
+    new_s <- s
+  }
+  diff_sig <- new_L[new_combs[1,new_s],, drop=FALSE] - new_U[new_combs[2,new_s],, drop=FALSE]
+  diff_insig <- new_U[new_combs[2,!new_s],, drop=FALSE] - new_L[new_combs[1,!new_s],, drop=FALSE]
+  diff_sig[which(diff_sig <= 0, arr.ind=TRUE)] <- NA
+  diff_insig[which(diff_insig <= 0, arr.ind=TRUE)] <- NA
+  d_sig <- suppressWarnings(apply(diff_sig, 2, min, na.rm=TRUE))
+  d_insig <- suppressWarnings(apply(diff_insig, 2, min, na.rm=TRUE))
+  d_sig <- ifelse(is.finite(d_sig), d_sig, 0)
+  d_insig <- ifelse(is.finite(d_insig), d_insig, 0)
+  easiness <- d_sig*d_insig
   res <- data.frame(level = lev_seq,
                     psame = apply(s_star, 2, \(x)mean(x == s)),
                     pdiff = mean(s),
@@ -191,14 +209,11 @@ viztest.vtsim <- function(obj,
               ci_tests = s_star,
               combs = combs,
               param_names = colnames(est),
-              thresh = thresh,
               L = L,
               U = U)
   class(res) <- "viztest"
   return(res)
 }
-
-
 
 #' Print Method for viztest Objects
 #'

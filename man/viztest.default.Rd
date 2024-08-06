@@ -12,7 +12,6 @@
   adjust = c("none", "holm", "hochberg", "hommel", "bonferroni", "BH", "BY", "fdr"),
   include_intercept = FALSE,
   include_zero = TRUE,
-  easy_thresh = 0.05,
   ...
 )
 }
@@ -30,9 +29,6 @@
 \item{include_intercept}{Logical indicating whether the intercept should be included in the tests, defaults to \code{FALSE}.}
 
 \item{include_zero}{Should univariate tests at zero be included, defaults to \code{TRUE}.}
-
-\item{easy_thresh}{Proportion of distance between the biggest upper bound and the smallest lower bound to use
-as the threshold in the calculation of "easiness".}
 
 \item{...}{Other arguments, currently not implemented.}
 }
