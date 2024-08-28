@@ -175,7 +175,7 @@ viztest.vtsim <- function(obj,
     L <- sapply(LU, \(x)x[1,])
     U <- sapply(LU, \(x)x[2,])
   }
-  s_star <- L[combs[1,], ] >= U[combs[2,], ]
+  s_star <- L[, combs[1,]] >= U[, combs[2,]]
   smat <- array(s, dim=dim(s_star))
   if(include_zero){
     w <- which(apply(est, 2, \(x)all(x == 0)))
