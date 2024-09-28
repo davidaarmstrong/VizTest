@@ -90,7 +90,7 @@ viztest.default <- function(obj,
     new_L <- L[-w, ]
     new_U <- U[-w, ]
     out <- which(combs[1,] == w | combs[2,] == w)
-    new_combs <- combs[, -out]
+    new_combs <- combs[, -out, drop = FALSE]
     new_combs[which(new_combs > w, arr.ind = TRUE)] <- new_combs[which(new_combs > w, arr.ind = TRUE)] - 1
     new_s <- s[-out]
   }else{
