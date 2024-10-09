@@ -267,7 +267,7 @@ print.viztest <- function(x, ..., best=TRUE, missed_tests=TRUE, level=NULL){
       w22 <- which((mt2$pw_test == "Sig" & mt2$ci_olap == "Yes") |
                      (mt2$pw_test == "Insig" & mt2$ci_olap == "No"))
       if(length(w22) > 0){
-        cat("\nMissed Tests for Lowest Level (n=", length(w22), " of ", length(x$pw_test), ")\n", sep="")
+        cat("\nMissed Tests for Middle Level (n=", length(w22), " of ", length(x$pw_test), ")\n", sep="")
         print(mt2[w22, ])
       }
       
@@ -281,7 +281,7 @@ print.viztest <- function(x, ..., best=TRUE, missed_tests=TRUE, level=NULL){
       w23 <- which((mt3$pw_test == "Sig" & mt3$ci_olap == "Yes") |
                      (mt3$pw_test == "Insig" & mt3$ci_olap == "No"))
       if(length(w23) > 0){
-        cat("\nMissed Tests for Lowest Level (n=", length(w23), " of ", length(x$pw_test), ")\n", sep="")
+        cat("\nMissed Tests for Highest Level (n=", length(w23), " of ", length(x$pw_test), ")\n", sep="")
         print(mt3[w23, ])
       }
       
@@ -297,7 +297,7 @@ print.viztest <- function(x, ..., best=TRUE, missed_tests=TRUE, level=NULL){
             tmp <- x$tab[which(x$tab$psame == max(x$tab$psame)), ]
       
       if(length(w24) > 0){
-        cat("\nMissed Tests for Lowest Level (n=", length(w24), " of ", length(x$pw_test), ")\n", sep="")
+        cat("\nMissed Tests for Easiest Level (n=", length(w24), " of ", length(x$pw_test), ")\n", sep="")
         print(mt4[w24, ])
       }
       if(length(w21) == 0){
