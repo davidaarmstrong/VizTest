@@ -13,7 +13,6 @@
   cifun = c("quantile", "hdi"),
   include_intercept = FALSE,
   include_zero = TRUE,
-  easy_thresh = 0.05,
   ...
 )
 }

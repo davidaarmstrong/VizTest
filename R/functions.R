@@ -36,6 +36,7 @@ viztest <- function(obj,
 #' @param range_levels The range of confidence levels to try.
 #' @param level_increment Step size of increase between the values of `range_levels`.
 #' @param adjust Multiplicity adjustment to use when calculating the p-values for the pairwise tests.
+#' @param cifun For simulation results, the method used to calculate the confidence/credible interval either "quantile" (default) or "hdi" for highest density region. 
 #' @param include_intercept Logical indicating whether the intercept should be included in the tests, defaults to `FALSE`.
 #' @param include_zero Should univariate tests at zero be included, defaults to `TRUE`.
 #' @param ... Other arguments, currently not implemented.
@@ -47,6 +48,7 @@ viztest.default <- function(obj,
                      range_levels = c(.25, .99),
                      level_increment = 0.01,
                      adjust = c("none", "holm", "hochberg", "hommel", "bonferroni", "BH", "BY", "fdr"),
+                     cifun = c("quantile", "hdi"), 
                      include_intercept = FALSE,
                      include_zero = TRUE,
                      ...){
@@ -225,6 +227,8 @@ viztest.vtsim <- function(obj,
 #' in confidence intervals for insignificant tests plus the distance between the lower and upper bound for tests that are significant.
 #' @param ... Other arguments, currently not implemented.
 #' @export
+#' @importFrom dplyr mutate
+#' @importFrom stats median
 #' @method print viztest
 print.viztest <- function(x, ..., best=TRUE, missed_tests=TRUE, level=NULL){
   cat("\nCorrespondents of PW Tests with CI Tests\n")
@@ -442,3 +446,64 @@ plot.viztest <- function(x, ..., ref_lines="none", viz_diff_thresh = .02, make_p
   }
   return(res)
 }
+
+#' Make custom visual testing data
+#' 
+#' Makes custom visual testing objects that can be used as input to the `viztest()` function.  This is useful in the case
+#' where `coef()` and `vcov()` do not function as expected on objects of interest or where normal theory tests may not be 
+#' as useful (e.g., in the case of simulations of non-normal values).  
+#' 
+#' @param estimates A vector of estimates if type is `"est_var"` and or a number of simulations by 
+#' number of parameters matrix of simulated values if type is `"sim"`.  
+#' @param variances In the case of independent estimates, a vector of variances of the same length 
+#' as `estimates` if type is `"est_var"`.  These will be used as the diagonal elements in a variance-covariance matrix with 
+#' zero covariances.  Alternatively, if type is `"est_var"`, this could be a variance-covariance matrix, with the same number 
+#' of rows and columns as there are elements in the `estimates` vector.  If type is `"sim"`, variances should be `NULL`, but 
+#' will be disregarded in any event. Also, note, these should be variances of the estimates (e.g., squared standard errors) and not 
+#' raw variances from the data. 
+#' @param type Indicates the type of input data either estimates with variances or a variance-covariance matrix or data from
+#' a simulation. 
+#' @param ... Other arguments passed down, currently not implemented. 
+#' @export
+#' 
+#' @examples
+#' est <- 1:4
+#' ses <- c(.4, .5, .6, .7)
+#' vtdat <- make_vt_data(est, ses^2)
+#' viztest(vtdat, 
+#'         test_level = .025, 
+#'         include_intercept = FALSE, 
+#'         include_zero = FALSE)
+#' 
+make_vt_data <- function(estimates, variances=NULL, type=c("est_var", "sim"), ...){
+  typ <- match.arg(type)
+  if(typ == "est_var"){
+    if(is.null(variances)){
+      stop("When specifying type 'est_var', variances must also be specified.\n")
+    }
+    if(!inherits(variances, "matrix") & length(estimates) != length(variances)){
+      stop("Variances must either be a matrix with rows and columns equal to those in estimates or a vector of the same length as estimates.\n")
+    }
+    if(inherits(variances, "matrix")){
+      if (nrow(variances) != length(estimates) | ncol(variances) != length(estimates)){
+        stop("Variance-covariance matrix must have the same number of rows and columns as there are elements in the estimates vector.\n")
+      }
+    }
+    if(!inherits(variances, "matrix")){
+      V <- diag(variances)
+    }else{
+      V <- variances
+    }
+    out <- structure(.Data = list(coef = estimates, vcov = V), class="vtcustom")
+  }else{
+    if(!is.null(variances)){
+      message("When type is 'sim', variances are disregarded.\n")
+    }
+    out <- structure(.Data = list(est = estimates), class="vtsim")
+  }
+  return(out)
+}
+
+
+
+
