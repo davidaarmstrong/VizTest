@@ -13,6 +13,7 @@ viztest(
   cifun = c("quantile", "hdi"),
   include_intercept = FALSE,
   include_zero = TRUE,
+  sig_diffs = NULL,
   ...
 )
 }
@@ -33,8 +34,13 @@ viztest(
 
 \item{include_zero}{Should univariate tests at zero be included, defaults to \code{TRUE}.}
 
+\item{sig_diffs}{An optional vector of values identify whether each pair of values is statistically different (1) or not (0).  See Details for more information on specifying this value; there is some added complexity here.}
+
 \item{...}{Other arguments, currently not implemented.}
 }
 \description{
 Calculate Correspondence Between Pairwise Test and CI Overlaps
+}
+\details{
+The \code{sig_diffs} argument m,ust be specified such that the stimuli are in order from highest to lowest.
 }

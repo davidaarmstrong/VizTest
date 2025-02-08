@@ -12,7 +12,9 @@ globalVariables(c("bound_end", "bound_start", "est", "label", "lwr", "stim_end",
 #' @param cifun For simulation results, the method used to calculate the confidence/credible interval either "quantile" (default) or "hdi" for highest density region. 
 #' @param include_intercept Logical indicating whether the intercept should be included in the tests, defaults to `FALSE`.
 #' @param include_zero Should univariate tests at zero be included, defaults to `TRUE`.
+#' @param sig_diffs An optional vector of values identify whether each pair of values is statistically different (1) or not (0).  See Details for more information on specifying this value; there is some added complexity here. 
 #' @param ... Other arguments, currently not implemented.
+#' @details The `sig_diffs` argument m,ust be specified such that the stimuli are in order from highest to lowest.  
 #' @export
 #' @importFrom stats coef vcov qt pt p.adjust
 #' @importFrom utils combn
@@ -25,6 +27,7 @@ viztest <- function(obj,
                     cifun = c("quantile", "hdi"), 
                     include_intercept = FALSE,
                     include_zero = TRUE,
+                    sig_diffs = NULL,
                     ...){
   UseMethod("viztest")
 }
@@ -39,6 +42,7 @@ viztest <- function(obj,
 #' @param cifun For simulation results, the method used to calculate the confidence/credible interval either "quantile" (default) or "hdi" for highest density region. 
 #' @param include_intercept Logical indicating whether the intercept should be included in the tests, defaults to `FALSE`.
 #' @param include_zero Should univariate tests at zero be included, defaults to `TRUE`.
+#' @param sig_diffs An optional vector of values identify whether each pair of values is statistically different (1) or not (0).  See Details for more information on specifying this value; there is some added complexity here. 
 #' @param ... Other arguments, currently not implemented.
 #' @method viztest default
 #' @importFrom dplyr tibble bind_rows
@@ -51,6 +55,7 @@ viztest.default <- function(obj,
                      cifun = c("quantile", "hdi"), 
                      include_intercept = FALSE,
                      include_zero = TRUE,
+                     sig_diffs = NULL,
                      ...){
   adj <- match.arg(adjust)
   lev_seq <- seq(range_levels[1], range_levels[2], by=level_increment)
@@ -68,25 +73,32 @@ viztest.default <- function(obj,
       V <- V[-w_int, -w_int]
     }
   }
-  if(include_zero)bhat <- c(bhat, zero=0)
+  if(include_zero){
+    bhat <- c(bhat, zero=0)
+    V <- cbind(rbind(V, 0), 0)
+  }
   o <- order(bhat, decreasing=TRUE)
   bhat <- bhat[o]
-  if(include_zero)V <- cbind(rbind(V, 0), 0)
   V <- V[o, o]
 
   combs <- combn(length(bhat), 2)
-  D <- matrix(0, nrow=length(bhat), ncol=ncol(combs))
-  D[cbind(combs[1,], 1:ncol(combs))] <- 1
-  D[cbind(combs[2,], 1:ncol(combs))] <- -1
-  diffs <- bhat %*% D
-  se_diffs <- sqrt(diag(t(D) %*% V %*% D))
-  p_diff <- pt(diffs/se_diffs, resdf, lower.tail=FALSE)
-  p_diff <- p.adjust(p_diff, method=adj)
-  s <- p_diff < test_level
+  if(is.null(sig_diffs)){
+    D <- matrix(0, nrow=length(bhat), ncol=ncol(combs))
+    D[cbind(combs[1,], 1:ncol(combs))] <- 1
+    D[cbind(combs[2,], 1:ncol(combs))] <- -1
+    diffs <- bhat %*% D
+    se_diffs <- sqrt(diag(t(D) %*% V %*% D))
+    p_diff <- pt(diffs/se_diffs, resdf, lower.tail=FALSE)
+    p_diff <- p.adjust(p_diff, method=adj)
+    s <- p_diff < test_level
+  }else{
+    s <- as.logical(sig_diffs)
+  }
   L <- sapply(lev_seq, \(l)bhat - qt(1-(1-l)/2, resdf)*sqrt(diag(V)))
   U <- sapply(lev_seq, \(l)bhat + qt(1-(1-l)/2, resdf)*sqrt(diag(V)))
   s_star <- L[combs[1,], ] >= U[combs[2,], ]
   smat <- array(s, dim=dim(s_star))
+  # remove tests against zero to calculate "easiness"
   if("zero" %in% rownames(L)){
     w <- which(rownames(L) == "zero")
     new_L <- L[-w, ]
@@ -138,6 +150,7 @@ viztest.default <- function(obj,
 #' @param cifun For simulation results, the method used to calculate the confidence/credible interval either "quantile" (default) or "hdi" for highest density region. 
 #' @param include_intercept Logical indicating whether the intercept should be included in the tests, defaults to `FALSE`.
 #' @param include_zero Should univariate tests at zero be included, defaults to `TRUE`.
+#' @param sig_diffs An optional vector of values identify whether each pair of values is statistically different (1) or not (0).  See Details for more information on specifying this value; there is some added complexity here. 
 #' @param ... Other arguments, currently not implemented.
 #' @importFrom stats quantile
 #' @importFrom HDInterval hdi
@@ -151,6 +164,7 @@ viztest.vtsim <- function(obj,
                           cifun = c("quantile", "hdi"), 
                           include_intercept = FALSE,
                           include_zero = TRUE,
+                          sig_diffs = NULL, 
                           ...){
   cif <- match.arg(cifun)
   est <- obj$est
@@ -161,13 +175,17 @@ viztest.vtsim <- function(obj,
   o <- order(cm, decreasing=TRUE)
   est <- est[,o]
   combs <- combn(ncol(est), 2)
-  D <- matrix(0, nrow=ncol(est), ncol=ncol(combs))
-  D[cbind(combs[1,], 1:ncol(combs))] <- 1
-  D[cbind(combs[2,], 1:ncol(combs))] <- -1
-  diffs <- est %*% D
-  pvals <- apply(diffs, 2, \(x)mean(x > 0))
-  pvals <- ifelse(pvals > .5, 1-pvals, pvals)
-  s <- pvals < test_level
+  if(is.null(sig_diffs)){
+    D <- matrix(0, nrow=ncol(est), ncol=ncol(combs))
+    D[cbind(combs[1,], 1:ncol(combs))] <- 1
+    D[cbind(combs[2,], 1:ncol(combs))] <- -1
+    diffs <- est %*% D
+    pvals <- apply(diffs, 2, \(x)mean(x > 0))
+    pvals <- ifelse(pvals > .5, 1-pvals, pvals)
+    s <- pvals < test_level
+  }else{
+    s <- sig_diffs
+  }
   lev_seq <- seq(range_levels[1], range_levels[2], by=level_increment)
   if(cif == "quantile"){
     L <- sapply(lev_seq, \(l)apply(est, 2, quantile, probs=((1-l)/2)))
@@ -505,5 +523,46 @@ make_vt_data <- function(estimates, variances=NULL, type=c("est_var", "sim"), ..
 }
 
 
+#' Make Template for Pairwise Significance Input
+#' 
+#' Provides a template for producing a binary vector indicating whether each pair of 
+#' estimates has a significant difference. 
+#' 
+#' @param estimates A vector of point estimates (ideally, a named vector). 
+#' @param include_zero Logical indicating whether tests against zero should be included. 
+#' @param include_intercept Logical indicating whether the intercept should be included. 
+#' @param ... Other arguments passed down, currently not implemented. 
+#' 
+#' @details The `viztest()` function uses a normal difference of means test to identify
+#' whether there is a significant difference or not.  While this test could be done 
+#' with adjustments for multiplicity or robust standard errors of all different kinds, 
+#' there may be times when the user would prefer to identify the significant differences 
+#' manually.  The `viztest()` function internally reorders the estimates from largest to smallest
+#' so this function does that and then prints the pairs that will correspond with the 
+#' visual testing grid search being done by `viztest()`.  
+#' 
+#' Please note that the `include_zero` and `include_intercept` arguments should be set the same
+#' here as they are in your call to `viztest()`.  If they are not, `viztest()` will stop because
+#' the results from the comparison of confidence intervals will have different dimensions than the 
+#' differences that are manually provides. 
+#' 
+#' @returns description A two-column data frame containing the names of the larger and smaller parameters in the appropriate order. 
+#' @examples
+#' make_diff_template(estimates = c(e1 = 2, e2 = 1, e3 = 3))
+#' @export
+make_diff_template <- function(estimates, include_zero=FALSE, include_intercept=FALSE, ...){
+  if(is.null(names(estimates))){
+    names(estimates) <- paste0("est_", 1:length(estimates))
+  }
+  if(include_zero)estimates <- c(estimates, zero=0)
+  if(!include_intercept)estimates <- estimates[!grepl("ntercept", names(estimates))]
+  est_num <- seq_along(estimates)
+  o <- order(estimates, decreasing = TRUE)
+  estimates <- estimates[o]
+  est_num <- est_num[o]
+  combs <- t(combn(names(estimates), 2))
+  colnames(combs) <- c("Larger", "Smaller")
+  as.data.frame(combs)
+}
 
 

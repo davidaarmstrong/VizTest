@@ -13,6 +13,7 @@
   cifun = c("quantile", "hdi"),
   include_intercept = FALSE,
   include_zero = TRUE,
+  sig_diffs = NULL,
   ...
 )
 }
@@ -32,6 +33,8 @@
 \item{include_intercept}{Logical indicating whether the intercept should be included in the tests, defaults to \code{FALSE}.}
 
 \item{include_zero}{Should univariate tests at zero be included, defaults to \code{TRUE}.}
+
+\item{sig_diffs}{An optional vector of values identify whether each pair of values is statistically different (1) or not (0).  See Details for more information on specifying this value; there is some added complexity here.}
 
 \item{...}{Other arguments, currently not implemented.}
 }
