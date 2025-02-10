@@ -6,7 +6,7 @@
 \usage{
 make_diff_template(
   estimates,
-  include_zero = FALSE,
+  include_zero = TRUE,
   include_intercept = FALSE,
   ...
 )

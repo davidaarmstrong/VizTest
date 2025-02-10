@@ -224,13 +224,19 @@ viztest.vtsim <- function(obj,
                     psame = apply(s_star, 2, \(x)mean(x == s)),
                     pdiff = mean(s),
                     easy = easiness)
+  cme <- colMeans(est)
+  esd <- apply(est, 2, sd)
+  est_data <- tibble(vbl = names(cme), 
+                     est = cme, 
+                     sd = esd)
   res <- list(tab = res,
               pw_test = s,
               ci_tests = s_star,
               combs = combs,
               param_names = colnames(est),
               L = L,
-              U = U)
+              U = U, 
+              est = est_data)
   class(res) <- "viztest"
   return(res)
 }
@@ -441,7 +447,7 @@ plot.viztest <- function(x, ..., ref_lines="none", viz_diff_thresh = .02, make_p
   segs$vbl <- rownames(segs)
   inp$label <- factor(1:nrow(inp), labels=inp$vbl)
   inp <- left_join(inp, segs, by=join_by(vbl))
-  cols <- c("est","se","lwr","upr","bound_start","bound_end")
+  cols <- c("est","lwr","upr","bound_start","bound_end")
   inp[,cols] <- apply(inp[,cols],2,trans)
   if(any(inp$vbl == "zero"))inp <- inp[-which(inp$vbl == "zero"), ]
   if(!make_plot){
@@ -550,7 +556,7 @@ make_vt_data <- function(estimates, variances=NULL, type=c("est_var", "sim"), ..
 #' @examples
 #' make_diff_template(estimates = c(e1 = 2, e2 = 1, e3 = 3))
 #' @export
-make_diff_template <- function(estimates, include_zero=FALSE, include_intercept=FALSE, ...){
+make_diff_template <- function(estimates, include_zero=TRUE, include_intercept=FALSE, ...){
   if(is.null(names(estimates))){
     names(estimates) <- paste0("est_", 1:length(estimates))
   }
