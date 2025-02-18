@@ -14,7 +14,7 @@ globalVariables(c("bound_end", "bound_start", "est", "label", "lwr", "stim_end",
 #' @param include_zero Should univariate tests at zero be included, defaults to `TRUE`.
 #' @param sig_diffs An optional vector of values identify whether each pair of values is statistically different (1) or not (0).  See Details for more information on specifying this value; there is some added complexity here. 
 #' @param ... Other arguments, currently not implemented.
-#' @details The `sig_diffs` argument m,ust be specified such that the stimuli are in order from highest to lowest.  
+#' @details The `sig_diffs` argument must be specified such that the stimuli are in order from highest to lowest.  
 #' @export
 #' @importFrom stats coef vcov qt pt p.adjust
 #' @importFrom utils combn
@@ -121,7 +121,7 @@ viztest.default <- function(obj,
   d_insig <- suppressWarnings(apply(diff_insig, 2, min, na.rm=TRUE))
   d_sig <- ifelse(is.finite(d_sig), d_sig, 0)
   d_insig <- ifelse(is.finite(d_insig), d_insig, 0)
-  easiness <- d_sig*d_insig
+  easiness <- -abs(d_sig-d_insig)
   res <- data.frame(level = lev_seq,
                     psame = apply(s_star, 2, \(x)mean(x == s)),
                     pdiff = mean(s),
@@ -219,7 +219,7 @@ viztest.vtsim <- function(obj,
   d_insig <- suppressWarnings(apply(diff_insig, 2, min, na.rm=TRUE))
   d_sig <- ifelse(is.finite(d_sig), d_sig, 0)
   d_insig <- ifelse(is.finite(d_insig), d_insig, 0)
-  easiness <- d_sig*d_insig
+  easiness <- -abs(d_sig-d_insig)
   res <- data.frame(level = lev_seq,
                     psame = apply(s_star, 2, \(x)mean(x == s)),
                     pdiff = mean(s),
