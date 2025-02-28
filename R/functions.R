@@ -46,6 +46,7 @@ viztest <- function(obj,
 #' @param ... Other arguments, currently not implemented.
 #' @method viztest default
 #' @importFrom dplyr tibble bind_rows
+#' @importFrom stats sd
 #' @export
 viztest.default <- function(obj,
                      test_level = 0.05,

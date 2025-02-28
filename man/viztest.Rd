@@ -42,5 +42,5 @@ viztest(
 Calculate Correspondence Between Pairwise Test and CI Overlaps
 }
 \details{
-The \code{sig_diffs} argument m,ust be specified such that the stimuli are in order from highest to lowest.
+The \code{sig_diffs} argument must be specified such that the stimuli are in order from highest to lowest.
 }
