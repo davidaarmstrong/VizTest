@@ -1,12 +1,12 @@
 Package: VizTest
 Title: Optimal Confidence Intervals for Visual Testing
-Version: 0.1
+Version: 0.3
 Authors@R: 
     c(person("Dave", "Armstrong", , email="davearmstrong.ps@gmail.com", role = c("aut", "cre"),
            comment = c(ORCID = "0000-0002-9358-2489")),
     person("William", "Poirier", , "wpoirier@uwo.ca", role = c("aut"),
            comment = c(ORCID = "0000-0002-3274-1351")))
-Description: The main function in the pacakge identifies the optimal confidence interval to represent the results of a set of pairwise tests.  
+Description: Identifies the optimal confidence level to represent the results of a set of pairwise tests as suggested by Armstrong and Poirier (2025) <doi:10.1017/pan.2024.24>.  
 Depends: R (>= 4.1.0), dplyr, ggplot2, HDInterval
 License: MIT + file LICENSE
 Encoding: UTF-8

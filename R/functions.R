@@ -16,6 +16,7 @@ globalVariables(c("bound_end", "bound_start", "est", "label", "lwr", "stim_end",
 #' @param ... Other arguments, currently not implemented.
 #' @details The `sig_diffs` argument must be specified such that the stimuli are in order from highest to lowest.  
 #' @export
+#' @references David A. Armstrong II and William Poirier. "Decoupling Visualization and Testing when Presenting Confidence Intervals" Political Analysis <doi:10.1017/pan.2024.24>.
 #' @importFrom stats coef vcov qt pt p.adjust
 #' @importFrom utils combn
 #'

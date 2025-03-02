@@ -44,3 +44,6 @@ Calculate Correspondence Between Pairwise Test and CI Overlaps
 \details{
 The \code{sig_diffs} argument must be specified such that the stimuli are in order from highest to lowest.
 }
+\references{
+David A. Armstrong II and William Poirier. "Decoupling Visualization and Testing when Presenting Confidence Intervals" Political Analysis \url{doi:10.1017/pan.2024.24}.
+}
