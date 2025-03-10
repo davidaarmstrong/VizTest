@@ -21,7 +21,8 @@ make_diff_template(
 \item{...}{Other arguments passed down, currently not implemented.}
 }
 \value{
-description A two-column data frame containing the names of the larger and smaller parameters in the appropriate order.
+A two-column data frame containing the names of the larger and smaller parameters in the appropriate order. This can be
+used to identify the appropriate order in which to specify the \code{sig_diffs} argument to \code{viztest()}.
 }
 \description{
 Provides a template for producing a binary vector indicating whether each pair of

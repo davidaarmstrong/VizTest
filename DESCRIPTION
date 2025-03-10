@@ -8,8 +8,10 @@ Authors@R:
            comment = c(ORCID = "0000-0002-3274-1351")))
 Description: Identifies the optimal confidence level to represent the results of a set of pairwise tests as suggested by Armstrong and Poirier (2025) <doi:10.1017/pan.2024.24>.  
 Depends: R (>= 4.1.0), dplyr, ggplot2, HDInterval
-Suggests: sandwich
+Suggests: carData, knitr, lme4, marginaleffects, patchwork, rmarkdown, sandwich, tidyr, wooldridge
+VignetteBuilder: knitr
 License: MIT + file LICENSE
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.2
+

@@ -439,39 +439,16 @@ make_vt_data <- function(estimates, variances=NULL, type=c("est_var", "sim"), ..
 }
 
 
-#'Coefficient Method for vtcustom Objects.
-#'
-#' Returns coefficients from an object of class `vtcustom`.  This allows users to build a
-#' list with estimates and a variance covariance matrix.  If the object's class is set to `vtcustom`
-#' and the object has an element `coef`, this coefficient method will return the vector of estimates.  
-#' For maximum usability, the entries of the coefficient vector should be named. 
-#' @param object An object of class `vtcustom`. 
-#' @param ... Currently not implemented
 #' @method coef vtcustom
 coef.vtcustom <- function(object, ...){
   object$coef
 }
 
-#' Variance-Covariance Method for vtcustom Objects.
-#'
-#' Returns the variance-covariance matrix from an object of class `vtcustom`.  This allows users to build a
-#' list with estimates and a variance covariance matrix.  If the object's class is set to `vtcustom`
-#' and the object has an element `vcov`, this coefficient method will return the variance-covariance matrix.  
-#' The matrix may have row and column names, but they will have no effect on the result. 
-#' @param object An object of class `vtcustom`. 
-#' @param ... Currently not implemented
 #' @method vcov vtcustom
 vcov.vtcustom <- function(object, ...){
   object$vcov
 }
 
-#' Make Reference Segments
-#' 
-#' Makes reference segments for the `plot.viztest`.  These segments run along the upper bound of a stimulus from the stimulus in question to the last comparison stimulus whose lower bound is smaller than the upper bound of the stimulus in question. 
-#' @param .data Data to be used in the calculating segments.  The data should contain the variables `lwr` and `upr` for the lower and upper confidence bounds, respectively. 
-#' @param vdt Visual difficulty threshold, see the details of `help(plot.viztest)` for an explanation of the parameter. 
-#' @param ... Other arguments to be passed down.  Currently not implemented. 
-#' @returns A data frame with variables `stim_start` and `stim_end` identifying the starting and ending stimuli for the segments as well as `bound_start` and `bound_end` which give the relevant value of the reference bound.  There is also a variable called `ambiguous` which indicates if any comparisons with that bound are ambiguous.
 #' @importFrom dplyr filter
 make_segs <- function(.data, vdt = .02, ...){
   segs <- NULL
@@ -597,7 +574,8 @@ plot.viztest <- function(x, ..., ref_lines="none", viz_diff_thresh = .02, make_p
 #' the results from the comparison of confidence intervals will have different dimensions than the 
 #' differences that are manually provides. 
 #' 
-#' @returns description A two-column data frame containing the names of the larger and smaller parameters in the appropriate order. 
+#' @returns A two-column data frame containing the names of the larger and smaller parameters in the appropriate order. This can be 
+#' used to identify the appropriate order in which to specify the `sig_diffs` argument to `viztest()`. 
 #' @examples
 #' make_diff_template(estimates = c(e1 = 2, e2 = 1, e3 = 3))
 #' @export
