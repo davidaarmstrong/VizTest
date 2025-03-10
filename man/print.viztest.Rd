@@ -18,6 +18,17 @@
 \item{level}{Which level should be used as the optimal one.  If \code{NULL}, the easiest optimal level will be used.  Easiness is measured by the sum of the overlap
 in confidence intervals for insignificant tests plus the distance between the lower and upper bound for tests that are significant.}
 }
+\value{
+Printed results that give the level(s) that correspond most closely with the pairwise test results.  The values returned are the smallest,
+largest, middle and easiest.  By default this function also reports the tests that are not captured by the (non-)overlaps in confidence intervals
+when each different level is used.
+}
 \description{
+Prints a summary of the results from the \code{viztest()} function.
+}
+\details{
+The results are printed in such a way that the range of optional levels is produced including the range along with two candidates for the
+best levels to use - middle and easiest.
+
 Prints the results from the viztest function
 }

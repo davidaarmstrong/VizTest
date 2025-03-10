@@ -1,8 +1,27 @@
-## TODO: fix simulation method to take quantile (credible interval) or HPD to calculate the overlaps. 
-
 globalVariables(c("bound_end", "bound_start", "est", "label", "lwr", "stim_end", "stim_start", "upr", "vbl"))
 
 #' Calculate Correspondence Between Pairwise Test and CI Overlaps
+#' 
+#' @description `viztest()` does a grid search over `range_levels` to find the confidence level(s) such that the (non-)overlaps in 
+#' confidence intervals corresponds as closely as possible with the results of pairwise tests.  To the extent that 
+#' a level is found that accounts for all pairwise tests, confidence bounds at this level can be added to coefficient or marginal 
+#' effects plots to enable readers to reliably identify estimates that are statistically different from each other. 
+#' 
+#' @details The algorithm first calculates results of a set of pairwise tests. For objects with estimates and a variance-covariance matrix, 
+#' normal theory tests are calculated.  Optionally, these tests can be subjected to a multiplicity adjustment.  In the case of simulation results, 
+#' something akin to p-values are calculated by identifying the probability that one estimate is larger than another.  To mimic the way we use p-values 
+#' in the frequentist case, we subtract the probability of difference from 1, such that smaller values indicate more confidence in the difference.  
+#' The algorithm then performs a grid search over `range_levels` at increments of `level_increment`.  For each candidate level, the 
+#' confidence intervals for all parameters are calculated.  For each pair of estimates, it identifies whether the confidence intervals 
+#' (or credible intervals if the input is a matrix of Bayesian simulation draws) overlaps.  For each candidate level, it calculates the proportion of times where
+#' differences are significant/credible and confidence/credible intervals do not overlap or differences are not significant/credible and the intervals do overlap.  
+#' The main idea is to find the level(s) such that the (non-)overlaps perfectly correspond with whether the differences are significant.  
+#' 
+#' If such a level can be found, a visual inspection of confidence or credible intervals at that level will identify whether a pair of estimates is 
+#' statistically different or not.  
+#' 
+#' While most of the parameters are straightforward, the `sig_diffs` argument must be specified such that the stimuli are in order from highest to lowest.  This is most 
+#' easily done by using `make_diff_template()` to identify the appropriate order of the comparisons.  
 #'
 #' @param obj A model object (or any object) where `coef()` and `vcov()` return estimates of coefficients and sampling variability.
 #' @param test_level The type I error rate of the pairwise tests.
@@ -14,12 +33,29 @@ globalVariables(c("bound_end", "bound_start", "est", "label", "lwr", "stim_end",
 #' @param include_zero Should univariate tests at zero be included, defaults to `TRUE`.
 #' @param sig_diffs An optional vector of values identify whether each pair of values is statistically different (1) or not (0).  See Details for more information on specifying this value; there is some added complexity here. 
 #' @param ... Other arguments, currently not implemented.
-#' @details The `sig_diffs` argument must be specified such that the stimuli are in order from highest to lowest.  
 #' @export
+#' 
 #' @references David A. Armstrong II and William Poirier. "Decoupling Visualization and Testing when Presenting Confidence Intervals" Political Analysis <doi:10.1017/pan.2024.24>.
 #' @importFrom stats coef vcov qt pt p.adjust
 #' @importFrom utils combn
-#'
+#' @returns A list (of class "viztest") with the following elements: 
+#' 1. tab: a data frame with results from the grid search.  The data frame has four variables: `level` - is the confidence level used in the grid search; `psame` - the proportion of (non-)overlaps that match the 
+#' normal theory tests; `pdiff` - the proportion of pairwise tests that are statistically significant; `easy` - the ease with which the comparisons are made. 
+#' 2. pw_tests: A logical vector indicating which tests are significantly significant. 
+#' 3. ci_tests: A logical vector indicating whether the confidence intervals are disjoint (`TRUE`) or overlap (`FALSE`). 
+#' 4. combs: The pairwise combinations of stimuli used in the test.  Note, the stimuli are reordered from largest to smallest, so the numbers do not represent the position in the original ordering. 
+#' 5. param_names: A vector of the names of the parameters reordered by size - largest to smallest. 
+#' 6. L: The lower confidence bounds from the grid search. 
+#' 7. U: The upper confidence bounds from the grid search. 
+#' 8. est: A data frame with the variables `vbl` - the parameter name; `est` - the parameter estimate; `se` - the parameter standard error. 
+#' @examples
+#' data(mtcars)
+#' mtcars$cyl <- as.factor(mtcars$cyl)
+#' mtcars$hp <- scale(mtcars$hp)
+#' mtcars$wt <- scale(mtcars$wt)
+#' mod <- lm(qsec ~ hp + wt + cyl, data=mtcars)
+#' viztest(mod)
+#' 
 viztest <- function(obj,
                     test_level = 0.05,
                     range_levels = c(.25, .99),
@@ -33,18 +69,6 @@ viztest <- function(obj,
   UseMethod("viztest")
 }
 
-#' Default method for viztest function
-#'
-#' @param obj A model object (or any object) where `coef()` and `vcov()` return estimates of coefficients and sampling variability.
-#' @param test_level The type I error rate of the pairwise tests.
-#' @param range_levels The range of confidence levels to try.
-#' @param level_increment Step size of increase between the values of `range_levels`.
-#' @param adjust Multiplicity adjustment to use when calculating the p-values for the pairwise tests.
-#' @param cifun For simulation results, the method used to calculate the confidence/credible interval either "quantile" (default) or "hdi" for highest density region. 
-#' @param include_intercept Logical indicating whether the intercept should be included in the tests, defaults to `FALSE`.
-#' @param include_zero Should univariate tests at zero be included, defaults to `TRUE`.
-#' @param sig_diffs An optional vector of values identify whether each pair of values is statistically different (1) or not (0).  See Details for more information on specifying this value; there is some added complexity here. 
-#' @param ... Other arguments, currently not implemented.
 #' @method viztest default
 #' @importFrom dplyr tibble bind_rows
 #' @importFrom stats sd
@@ -142,18 +166,6 @@ viztest.default <- function(obj,
   class(res) <- "viztest"
   return(res)
 }
-#' Simulation method for viztest function
-#' 
-#' @param obj A model object (or any object) where `coef()` and `vcov()` return estimates of coefficients and sampling variability.
-#' @param test_level The type I error rate of the pairwise tests.
-#' @param range_levels The range of confidence levels to try.
-#' @param level_increment Step size of increase between the values of `range_levels`.
-#' @param adjust Multiplicity adjustment to use when calculating the p-values for the pairwise tests.
-#' @param cifun For simulation results, the method used to calculate the confidence/credible interval either "quantile" (default) or "hdi" for highest density region. 
-#' @param include_intercept Logical indicating whether the intercept should be included in the tests, defaults to `FALSE`.
-#' @param include_zero Should univariate tests at zero be included, defaults to `TRUE`.
-#' @param sig_diffs An optional vector of values identify whether each pair of values is statistically different (1) or not (0).  See Details for more information on specifying this value; there is some added complexity here. 
-#' @param ... Other arguments, currently not implemented.
 #' @importFrom stats quantile
 #' @importFrom HDInterval hdi
 #' @method viztest vtsim
@@ -245,6 +257,11 @@ viztest.vtsim <- function(obj,
 
 #' Print Method for viztest Objects
 #'
+#' @description Prints a summary of the results from the `viztest()` function.  
+#' 
+#' @details The results are printed in such a way that the range of optional levels is produced including the range along with two candidates for the 
+#' best levels to use - middle and easiest.  
+#'
 #' Prints the results from the viztest function
 #' @param x An object of class `viztest`.
 #' @param best Logical indicating whether the results should be filtered to include only the best level(s) or include all levels
@@ -252,6 +269,10 @@ viztest.vtsim <- function(obj,
 #' @param level Which level should be used as the optimal one.  If `NULL`, the easiest optimal level will be used.  Easiness is measured by the sum of the overlap
 #' in confidence intervals for insignificant tests plus the distance between the lower and upper bound for tests that are significant.
 #' @param ... Other arguments, currently not implemented.
+#' @returns Printed results that give the level(s) that correspond most closely with the pairwise test results.  The values returned are the smallest, 
+#' largest, middle and easiest.  By default this function also reports the tests that are not captured by the (non-)overlaps in confidence intervals
+#' when each different level is used. 
+#' 
 #' @export
 #' @importFrom dplyr mutate
 #' @importFrom stats median
@@ -351,6 +372,73 @@ print.viztest <- function(x, ..., best=TRUE, missed_tests=TRUE, level=NULL){
   }
 }
 
+#' Make custom visual testing data
+#' 
+#' @description Makes custom visual testing objects that can be used as input to the `viztest()` function.  This is useful in the case
+#' where `coef()` and `vcov()` do not function as expected on objects of interest, where the user wants to intervene with some 
+#' modification to the usual estimates or (more likely) variance-covariance matrix or where normal theory tests may not be 
+#' as useful (e.g., in the case of simulations of non-normal values).  The examples section below shows how this could be leveraged
+#' to use a heteroskedasticity-consistent covariance matrix in the test rather than the one returned by `lm()`. 
+#' 
+#' @param estimates A vector of estimates if type is `"est_var"` and or a number of simulations by 
+#' number of parameters matrix of simulated values if type is `"sim"`.  
+#' @param variances In the case of independent estimates, a vector of variances of the same length 
+#' as `estimates` if type is `"est_var"`.  These will be used as the diagonal elements in a variance-covariance matrix with 
+#' zero covariances.  Alternatively, if type is `"est_var"`, this could be a variance-covariance matrix, with the same number 
+#' of rows and columns as there are elements in the `estimates` vector.  If type is `"sim"`, variances should be `NULL`, but 
+#' will be disregarded in any event. Also, note, these should be variances of the estimates (e.g., squared standard errors) and not 
+#' raw variances from the data. 
+#' @param type Indicates the type of input data either estimates with variances or a variance-covariance matrix or data from
+#' a simulation. 
+#' @param ... Other arguments passed down, currently not implemented. 
+#' @returns An object of class "vtcustom" that takes one of two forms: 
+#' 1. A list with estimates and a variance-covariance matrix.  In this case, the functionms `coef.vtcustom()` and `vcov.vtcustom()` are 
+#' used to extract the coefficients and variance-covariance matrix in a way that will work with `viztest.default()`. 
+#' 2. An object of class "vtsim" that has a single element - the data giving the draws from the simulation. 
+#' @export
+#' 
+#' @examples
+#' data(mtcars)
+#' mtcars$cyl <- as.factor(mtcars$cyl)
+#' mtcars$hp <- scale(mtcars$hp)
+#' mtcars$wt <- scale(mtcars$wt)
+#' mod <- lm(qsec ~ hp + wt + cyl, data=mtcars)
+#' V <- sandwich::vcovHC(mod, "HC3")
+#' vtdat <- make_vt_data(coef(mod), V)
+#' viztest(vtdat, 
+#'         test_level = .025, 
+#'         include_intercept = FALSE, 
+#'         include_zero = FALSE)
+make_vt_data <- function(estimates, variances=NULL, type=c("est_var", "sim"), ...){
+  typ <- match.arg(type)
+  if(typ == "est_var"){
+    if(is.null(variances)){
+      stop("When specifying type 'est_var', variances must also be specified.\n")
+    }
+    if(!inherits(variances, "matrix") & length(estimates) != length(variances)){
+      stop("Variances must either be a matrix with rows and columns equal to those in estimates or a vector of the same length as estimates.\n")
+    }
+    if(inherits(variances, "matrix")){
+      if (nrow(variances) != length(estimates) | ncol(variances) != length(estimates)){
+        stop("Variance-covariance matrix must have the same number of rows and columns as there are elements in the estimates vector.\n")
+      }
+    }
+    if(!inherits(variances, "matrix")){
+      V <- diag(variances)
+    }else{
+      V <- variances
+    }
+    out <- structure(.Data = list(coef = estimates, vcov = V), class="vtcustom")
+  }else{
+    if(!is.null(variances)){
+      message("When type is 'sim', variances are disregarded.\n")
+    }
+    out <- structure(.Data = list(est = estimates), class="vtsim")
+  }
+  return(out)
+}
+
+
 #'Coefficient Method for vtcustom Objects.
 #'
 #' Returns coefficients from an object of class `vtcustom`.  This allows users to build a
@@ -360,7 +448,6 @@ print.viztest <- function(x, ..., best=TRUE, missed_tests=TRUE, level=NULL){
 #' @param object An object of class `vtcustom`. 
 #' @param ... Currently not implemented
 #' @method coef vtcustom
-#' @export
 coef.vtcustom <- function(object, ...){
   object$coef
 }
@@ -374,7 +461,6 @@ coef.vtcustom <- function(object, ...){
 #' @param object An object of class `vtcustom`. 
 #' @param ... Currently not implemented
 #' @method vcov vtcustom
-#' @export
 vcov.vtcustom <- function(object, ...){
   object$vcov
 }
@@ -387,7 +473,6 @@ vcov.vtcustom <- function(object, ...){
 #' @param ... Other arguments to be passed down.  Currently not implemented. 
 #' @returns A data frame with variables `stim_start` and `stim_end` identifying the starting and ending stimuli for the segments as well as `bound_start` and `bound_end` which give the relevant value of the reference bound.  There is also a variable called `ambiguous` which indicates if any comparisons with that bound are ambiguous.
 #' @importFrom dplyr filter
-#' @export
 make_segs <- function(.data, vdt = .02, ...){
   segs <- NULL
   for(i in 1:nrow(.data)){
@@ -423,9 +508,24 @@ make_segs <- function(.data, vdt = .02, ...){
 #' A comparison is determined to be visually difficult if the upper bound of the stimulus in question is within `viz_diff_thresh` times the difference between the smallest lower bound and the largest upper bound.  If `ref_lines = "non"`, then none of the reference lines are plotted. 
 #' Alternatively, you can specify the names of stimuli whose reference lines will be plotted.  These should be the same as the names in the data.  The `viztest()` function returns an object `est`, which contains the data that are used as input to this function.  The variable `vbl` in 
 #' The `est` data frame contains the stimulus names. 
+#' @returns By default, a ggplot is returned.  If `make_plot = FALSE`, the data for the plot are returned, but the plot is not constructed.  If the data are returned, the following variables are in the dataset: 
+#' * `vbl` - The name of the parameter. 
+#' * `est` - The parameter estimate
+#' * `se` - The standard error of the estimate
+#' * `lwr`, `upr` - The inferential confidence bounds being used
+#' * `label` - Factor giving the parameter names
+#' * `stim_start`, `stim_end` - y-axis bounds of the reference line
+#' * `bound_start`, `bound_end` - x-axis values for reference lines
+#' * `ambiguous` - Logical vector indicating whether the comparison is considered "ambiguous". 
 #' @method plot viztest
 #' @importFrom dplyr left_join arrange `%>%` join_by
 #' @importFrom ggplot2 ggplot geom_pointrange geom_segment aes
+#' @examples
+#' data(mtcars)
+#' mod2 <- lm(mpg ~ as.factor(cyl) + vs + am + as.factor(gear), data = mtcars)
+#' v <- viztest(mod2)
+#' plot(v, ref_lines="ambiguous") + ggplot2::theme_classic()
+#' 
 #' @export
 plot.viztest <- function(x, ..., ref_lines="none", viz_diff_thresh = .02, make_plot=TRUE, level=c("ce","max","min","median"),trans=I){
   inp <- x$est
@@ -471,63 +571,6 @@ plot.viztest <- function(x, ..., ref_lines="none", viz_diff_thresh = .02, make_p
     res <- g
   }
   return(res)
-}
-
-#' Make custom visual testing data
-#' 
-#' Makes custom visual testing objects that can be used as input to the `viztest()` function.  This is useful in the case
-#' where `coef()` and `vcov()` do not function as expected on objects of interest or where normal theory tests may not be 
-#' as useful (e.g., in the case of simulations of non-normal values).  
-#' 
-#' @param estimates A vector of estimates if type is `"est_var"` and or a number of simulations by 
-#' number of parameters matrix of simulated values if type is `"sim"`.  
-#' @param variances In the case of independent estimates, a vector of variances of the same length 
-#' as `estimates` if type is `"est_var"`.  These will be used as the diagonal elements in a variance-covariance matrix with 
-#' zero covariances.  Alternatively, if type is `"est_var"`, this could be a variance-covariance matrix, with the same number 
-#' of rows and columns as there are elements in the `estimates` vector.  If type is `"sim"`, variances should be `NULL`, but 
-#' will be disregarded in any event. Also, note, these should be variances of the estimates (e.g., squared standard errors) and not 
-#' raw variances from the data. 
-#' @param type Indicates the type of input data either estimates with variances or a variance-covariance matrix or data from
-#' a simulation. 
-#' @param ... Other arguments passed down, currently not implemented. 
-#' @export
-#' 
-#' @examples
-#' est <- 1:4
-#' ses <- c(.4, .5, .6, .7)
-#' vtdat <- make_vt_data(est, ses^2)
-#' viztest(vtdat, 
-#'         test_level = .025, 
-#'         include_intercept = FALSE, 
-#'         include_zero = FALSE)
-#' 
-make_vt_data <- function(estimates, variances=NULL, type=c("est_var", "sim"), ...){
-  typ <- match.arg(type)
-  if(typ == "est_var"){
-    if(is.null(variances)){
-      stop("When specifying type 'est_var', variances must also be specified.\n")
-    }
-    if(!inherits(variances, "matrix") & length(estimates) != length(variances)){
-      stop("Variances must either be a matrix with rows and columns equal to those in estimates or a vector of the same length as estimates.\n")
-    }
-    if(inherits(variances, "matrix")){
-      if (nrow(variances) != length(estimates) | ncol(variances) != length(estimates)){
-        stop("Variance-covariance matrix must have the same number of rows and columns as there are elements in the estimates vector.\n")
-      }
-    }
-    if(!inherits(variances, "matrix")){
-      V <- diag(variances)
-    }else{
-      V <- variances
-    }
-    out <- structure(.Data = list(coef = estimates, vcov = V), class="vtcustom")
-  }else{
-    if(!is.null(variances)){
-      message("When type is 'sim', variances are disregarded.\n")
-    }
-    out <- structure(.Data = list(est = estimates), class="vtsim")
-  }
-  return(out)
 }
 
 

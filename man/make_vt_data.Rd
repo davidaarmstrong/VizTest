@@ -22,18 +22,31 @@ a simulation.}
 
 \item{...}{Other arguments passed down, currently not implemented.}
 }
+\value{
+An object of class "vtcustom" that takes one of two forms:
+\enumerate{
+\item A list with estimates and a variance-covariance matrix.  In this case, the functionms \code{coef.vtcustom()} and \code{vcov.vtcustom()} are
+used to extract the coefficients and variance-covariance matrix in a way that will work with \code{viztest.default()}.
+\item An object of class "vtsim" that has a single element - the data giving the draws from the simulation.
+}
+}
 \description{
 Makes custom visual testing objects that can be used as input to the \code{viztest()} function.  This is useful in the case
-where \code{coef()} and \code{vcov()} do not function as expected on objects of interest or where normal theory tests may not be
-as useful (e.g., in the case of simulations of non-normal values).
+where \code{coef()} and \code{vcov()} do not function as expected on objects of interest, where the user wants to intervene with some
+modification to the usual estimates or (more likely) variance-covariance matrix or where normal theory tests may not be
+as useful (e.g., in the case of simulations of non-normal values).  The examples section below shows how this could be leveraged
+to use a heteroskedasticity-consistent covariance matrix in the test rather than the one returned by \code{lm()}.
 }
 \examples{
-est <- 1:4
-ses <- c(.4, .5, .6, .7)
-vtdat <- make_vt_data(est, ses^2)
+data(mtcars)
+mtcars$cyl <- as.factor(mtcars$cyl)
+mtcars$hp <- scale(mtcars$hp)
+mtcars$wt <- scale(mtcars$wt)
+mod <- lm(qsec ~ hp + wt + cyl, data=mtcars)
+V <- sandwich::vcovHC(mod, "HC3")
+vtdat <- make_vt_data(coef(mod), V)
 viztest(vtdat, 
         test_level = .025, 
         include_intercept = FALSE, 
         include_zero = FALSE)
-
 }

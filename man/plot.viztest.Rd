@@ -29,6 +29,19 @@
 
 \item{trans}{A function to transform the estimates and their confidence intervals like \code{plogis}.}
 }
+\value{
+By default, a ggplot is returned.  If \code{make_plot = FALSE}, the data for the plot are returned, but the plot is not constructed.  If the data are returned, the following variables are in the dataset:
+\itemize{
+\item \code{vbl} - The name of the parameter.
+\item \code{est} - The parameter estimate
+\item \code{se} - The standard error of the estimate
+\item \code{lwr}, \code{upr} - The inferential confidence bounds being used
+\item \code{label} - Factor giving the parameter names
+\item \code{stim_start}, \code{stim_end} - y-axis bounds of the reference line
+\item \code{bound_start}, \code{bound_end} - x-axis values for reference lines
+\item \code{ambiguous} - Logical vector indicating whether the comparison is considered "ambiguous".
+}
+}
 \description{
 Plots the output of viztest objects with optional reference lines
 }
@@ -38,4 +51,11 @@ When \code{ref_lines = "all"}, all lines are plotted, though in displays with ma
 A comparison is determined to be visually difficult if the upper bound of the stimulus in question is within \code{viz_diff_thresh} times the difference between the smallest lower bound and the largest upper bound.  If \code{ref_lines = "non"}, then none of the reference lines are plotted.
 Alternatively, you can specify the names of stimuli whose reference lines will be plotted.  These should be the same as the names in the data.  The \code{viztest()} function returns an object \code{est}, which contains the data that are used as input to this function.  The variable \code{vbl} in
 The \code{est} data frame contains the stimulus names.
+}
+\examples{
+data(mtcars)
+mod2 <- lm(mpg ~ as.factor(cyl) + vs + am + as.factor(gear), data = mtcars)
+v <- viztest(mod2)
+plot(v, ref_lines="ambiguous") + ggplot2::theme_classic()
+
 }

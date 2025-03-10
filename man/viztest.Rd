@@ -38,11 +38,51 @@ viztest(
 
 \item{...}{Other arguments, currently not implemented.}
 }
+\value{
+A list (of class "viztest") with the following elements:
+\enumerate{
+\item tab: a data frame with results from the grid search.  The data frame has four variables: \code{level} - is the confidence level used in the grid search; \code{psame} - the proportion of (non-)overlaps that match the
+normal theory tests; \code{pdiff} - the proportion of pairwise tests that are statistically significant; \code{easy} - the ease with which the comparisons are made.
+\item pw_tests: A logical vector indicating which tests are significantly significant.
+\item ci_tests: A logical vector indicating whether the confidence intervals are disjoint (\code{TRUE}) or overlap (\code{FALSE}).
+\item combs: The pairwise combinations of stimuli used in the test.  Note, the stimuli are reordered from largest to smallest, so the numbers do not represent the position in the original ordering.
+\item param_names: A vector of the names of the parameters reordered by size - largest to smallest.
+\item L: The lower confidence bounds from the grid search.
+\item U: The upper confidence bounds from the grid search.
+\item est: A data frame with the variables \code{vbl} - the parameter name; \code{est} - the parameter estimate; \code{se} - the parameter standard error.
+}
+}
 \description{
-Calculate Correspondence Between Pairwise Test and CI Overlaps
+\code{viztest()} does a grid search over \code{range_levels} to find the confidence level(s) such that the (non-)overlaps in
+confidence intervals corresponds as closely as possible with the results of pairwise tests.  To the extent that
+a level is found that accounts for all pairwise tests, confidence bounds at this level can be added to coefficient or marginal
+effects plots to enable readers to reliably identify estimates that are statistically different from each other.
 }
 \details{
-The \code{sig_diffs} argument must be specified such that the stimuli are in order from highest to lowest.
+The algorithm first calculates results of a set of pairwise tests. For objects with estimates and a variance-covariance matrix,
+normal theory tests are calculated.  Optionally, these tests can be subjected to a multiplicity adjustment.  In the case of simulation results,
+something akin to p-values are calculated by identifying the probability that one estimate is larger than another.  To mimic the way we use p-values
+in the frequentist case, we subtract the probability of difference from 1, such that smaller values indicate more confidence in the difference.
+The algorithm then performs a grid search over \code{range_levels} at increments of \code{level_increment}.  For each candidate level, the
+confidence intervals for all parameters are calculated.  For each pair of estimates, it identifies whether the confidence intervals
+(or credible intervals if the input is a matrix of Bayesian simulation draws) overlaps.  For each candidate level, it calculates the proportion of times where
+differences are significant/credible and confidence/credible intervals do not overlap or differences are not significant/credible and the intervals do overlap.
+The main idea is to find the level(s) such that the (non-)overlaps perfectly correspond with whether the differences are significant.
+
+If such a level can be found, a visual inspection of confidence or credible intervals at that level will identify whether a pair of estimates is
+statistically different or not.
+
+While most of the parameters are straightforward, the \code{sig_diffs} argument must be specified such that the stimuli are in order from highest to lowest.  This is most
+easily done by using \code{make_diff_template()} to identify the appropriate order of the comparisons.
+}
+\examples{
+data(mtcars)
+mtcars$cyl <- as.factor(mtcars$cyl)
+mtcars$hp <- scale(mtcars$hp)
+mtcars$wt <- scale(mtcars$wt)
+mod <- lm(qsec ~ hp + wt + cyl, data=mtcars)
+viztest(mod)
+
 }
 \references{
 David A. Armstrong II and William Poirier. "Decoupling Visualization and Testing when Presenting Confidence Intervals" Political Analysis \url{doi:10.1017/pan.2024.24}.
