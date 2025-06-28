@@ -1,4 +1,4 @@
-globalVariables(c("bound_end", "bound_start", "est", "label", "lwr", "stim_end", "stim_start", "upr", "vbl"))
+globalVariables(c("bound_end", "bound_start", "est", "label", "lwr", "stim_end", "stim_start", "upr", "vbl", "i", "j", "vij", "zb"))
 
 #' Calculate Correspondence Between Pairwise Test and CI Overlaps
 #' 
@@ -444,6 +444,11 @@ coef.vtcustom <- function(object, ...){
   object$coef
 }
 
+#' @method coef eff
+coef.eff <- function(object, ...){
+  object$fit
+}
+
 #' @method vcov vtcustom
 vcov.vtcustom <- function(object, ...){
   object$vcov
@@ -594,4 +599,71 @@ make_diff_template <- function(estimates, include_zero=TRUE, include_intercept=F
   as.data.frame(combs)
 }
 
+#' Calculate z-score for Confidence Interval Overlap
+#' 
+#' Calculates the z-score required such that confidence intervals do not overlap under the null hypothesis withe a specified probability. 
+#' @param b A vector of estiamtes
+#' @param v The variance-covariance matrix for `b`. 
+#' @param alpha The desired probability at which the confidence intervals do not overlap under the null hypothesis.  
+#' @param df Degrees of freedom for the t-distribution, defaults to `Inf` indicating a normal distribution. 
+#' @param ... Other arguments passed down, currently not implemented.
+#' 
+#' @importFrom stats cov2cor qnorm pnorm pt qt sd
+#' @importFrom dplyr summarise group_by row_number mutate select
+#' @importFrom tidyr pivot_longer
+#' 
+#' @returns A list with two elements:
+#' `ave_z`: A data frame with one row for each estimate in `b` and the following variables: 
+#' * `vij`: observation number 
+#' * `s_zb`: standard deviation of the z-scores across all pairs of intervals containing that estimate. 
+#' * `min_zb`, `max_zb`: The minimum and maximum z-scores for the pairs of intervals containing that estimate.
+#' * `zb`: The mean z-score for the pairs of intervals containing that estimate.
+#' * `ci`: The confidence level corresponding to `zb`. 
+#' `all_z`: A data frame with one row for each pair of estimates in `b` and the following variables:
+#' * `i`, `j`: The indices of the two estimates in the pair.
+#' * `s_i`, `s_j`: The standard errors of the two estimates in the pair.
+#' * `theta`: The ratio of the standard errors of the two estimates.
+#' * `rho`: The correlation between the two estimates.
+#' * `zb`: The z-score for the pair of estimates.
+#' * `ci` : The confidence level corresponding to `zb`.
+#' * `olap_ave` The probability that the two intervals do not overlap under the null hypothesis. 
+#' * `olap_84` The probability that two 84% confidence intervals for the estimates in the pair would not overlap under the null hypothesis. 
+#' @references 
+#' Harvey Goldstein and Michael J.R. Healy.  (1995) "The Graphical Presentation of A Collection of Means." Journal of the Royal Statistical Society, Series A 158(1): 175-177 <doi:10.2307/2983411>. 
+#' David Afshartous and Richard A. Preston.  (2010) "Confidence Intervals for Dependent Data: Equating Non-overlap with Statistical Significance." Computational Statistics and Data Analysis 54: 2296-2305 <doi:10.1016/j.csda.2010.04.011>
+#' @export
+#' @examples
+#' data(mtcars)
+#' mod <- lm(mpg ~ wt + hp + disp + vs, data=mtcars)
+#' gen_z(coef(mod), vcov(mod))
+#' 
+gen_z <- function(b, v, alpha=.05, df = Inf, ...){
+  f2.theta.rho <- function(theta, rho) { theta/(theta^{2} +1 - 2*rho*theta)^(1/2) + (1/theta)/(1 + theta^(-2) - 2*rho*theta^{-1})^(1/2)}
+  f2.alpha.theta.rho.t.beta <- function(alpha, theta, df, rho) {qt(alpha/2, df, lower.tail=FALSE)/f2.theta.rho(theta, rho) }
+  se <- sqrt(diag(v))
+  rho <- cov2cor(v)
+  eg <- expand.grid(i=1:length(b), j=1:length(b)) 
+  eg <- eg[which(eg[,1] < eg[,2]), ]
+  eg$s_i <- se[eg[,1]]
+  eg$s_j <- se[eg[,2]]
+  eg$theta = eg$s_i/eg$s_j
+  eg$rho <- rho[cbind(eg[,1], eg[,2])]
+  eg$zb <- f2.alpha.theta.rho.t.beta(alpha, eg$theta, df, eg$rho)
+  eg$ci <- 1-2*pt(eg$zb, df, lower.tail=FALSE)
+  eg$olap_ave = 2*pnorm(mean(eg$zb)*f2.theta.rho(eg$theta, eg$rho), lower.tail=FALSE)
+  eg$olap_84 = 2*pnorm(qnorm(.92)*f2.theta.rho(eg$theta, eg$rho), lower.tail=FALSE)
+  
+  tmp <- eg %>% select(i, j, zb) %>% 
+    mutate(obs = row_number()) %>% 
+    pivot_longer(c("i", "j"), names_to = "ij", values_to = "vij") %>% 
+    group_by(vij) %>% 
+    summarise(s_zb = sd(zb), 
+              min_zb = min(zb), 
+              max_zb = max(zb), 
+              zb = mean(zb)
+    ) %>% 
+    mutate(ci = 1-2*pt(zb, df, lower.tail=FALSE))
+  
+  return(list(ave_z = tmp, all_z = eg))
+}
 
