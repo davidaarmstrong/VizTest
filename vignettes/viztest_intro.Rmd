@@ -350,7 +350,7 @@ ap_sim <- avg_predictions(model3,
 The "posterior" attribute of the resulting object has the estimates-by-draws posterior simulation values.  We transpose that matrix and add some column names.  We then pass that to `make_vt_data()` with the argument `type="sim"` and call `viztest()`.  Inferential highest density intervals between $76\%$ and $82\%$ all account for the pairwise tests perfectly.  The $79\%$ HDIs are easiest to evaluate. 
 
 ```{r,echo=T}
-post <- t(attr(ap_sim, "posterior"))
+post <- get_draws(ap_sim, "DxP")
 colnames(post) <- paste0("b", 1:ncol(post))
 post_vt <- make_vt_data(post, type="sim")
 vt_sim <- viztest(post_vt, cifun="hdi", include_zero=FALSE)
