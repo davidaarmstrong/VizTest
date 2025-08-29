@@ -1,6 +1,6 @@
 Package: VizTest
 Title: Optimal Confidence Intervals for Visual Testing
-Version: 0.4
+Version: 0.5
 Authors@R: 
     c(person("Dave", "Armstrong", , email="davearmstrong.ps@gmail.com", role = c("aut", "cre"),
            comment = c(ORCID = "0000-0002-9358-2489")),
