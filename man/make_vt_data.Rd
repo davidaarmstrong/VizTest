@@ -23,11 +23,10 @@ a simulation.}
 \item{...}{Other arguments passed down, currently not implemented.}
 }
 \value{
-An object of class "vtcustom" that takes one of two forms:
 \enumerate{
-\item A list with estimates and a variance-covariance matrix.  In this case, the functionms \code{coef.vtcustom()} and \code{vcov.vtcustom()} are
+\item If the input is a vector of parameter estimates and a variance-covariance matrix, then a list with estimates and a variance-covariance matrix of class \code{"vtcustom"} is returned.  In this case, the functionms \code{coef.vtcustom()} and \code{vcov.vtcustom()} are
 used to extract the coefficients and variance-covariance matrix in a way that will work with \code{viztest.default()}.
-\item An object of class "vtsim" that has a single element - the data giving the draws from the simulation.
+\item If the input is a matrix of simulation draws, an object of class \code{"vtsim"} that has a single element - the data giving the draws from the simulation is returned.  In this case, \code{viztest.vtsim()} does the relevant testing.
 }
 }
 \description{

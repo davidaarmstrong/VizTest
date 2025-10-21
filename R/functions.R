@@ -39,6 +39,7 @@ globalVariables(c("bound_end", "bound_start", "est", "label", "lwr", "stim_end",
 #' @references David A. Armstrong II and William Poirier. "Decoupling Visualization and Testing when Presenting Confidence Intervals" Political Analysis <doi:10.1017/pan.2024.24>.
 #' @importFrom stats coef vcov qt pt p.adjust
 #' @importFrom utils combn
+#' @importFrom matrixcalc is.positive.definite
 #' @returns A list (of class "viztest") with the following elements: 
 #' 1. tab: a data frame with results from the grid search.  The data frame has four variables: `level` - is the confidence level used in the grid search; `psame` - the proportion of (non-)overlaps that match the 
 #' normal theory tests; `pdiff` - the proportion of pairwise tests that are statistically significant; `easy` - the ease with which the comparisons are made. 
@@ -95,6 +96,12 @@ viztest.default <- function(obj,
   bhat <- coef(obj)
   if(is.null(names(bhat)))names(bhat) <- 1:length(bhat)
   V <- vcov(obj)
+  if(!is.positive.definite(V)){
+    stop("Variance-covariance matrix is not positive definite.  Cannot proceed with viztest().\n")
+  }
+  if(!(length(bhat) == nrow(V) & isSymmetric(V))){
+    stop("Length of coefficient vector does not match dimensions of variance-covariance matrix.  Cannot proceed with viztest().\n")
+  }
   if(!include_intercept){
     w_int <- grep("ntercept", names(bhat))
     if(length(w_int) > 0){
@@ -416,10 +423,10 @@ print.viztest <- function(x, ..., best=TRUE, missed_tests=TRUE, level=NULL){
 #' @param type Indicates the type of input data either estimates with variances or a variance-covariance matrix or data from
 #' a simulation. 
 #' @param ... Other arguments passed down, currently not implemented. 
-#' @returns An object of class "vtcustom" that takes one of two forms: 
-#' 1. A list with estimates and a variance-covariance matrix.  In this case, the functionms `coef.vtcustom()` and `vcov.vtcustom()` are 
+#' @returns 
+#' 1. If the input is a vector of parameter estimates and a variance-covariance matrix, then a list with estimates and a variance-covariance matrix of class `"vtcustom"` is returned.  In this case, the functionms `coef.vtcustom()` and `vcov.vtcustom()` are 
 #' used to extract the coefficients and variance-covariance matrix in a way that will work with `viztest.default()`. 
-#' 2. An object of class "vtsim" that has a single element - the data giving the draws from the simulation. 
+#' 2. If the input is a matrix of simulation draws, an object of class `"vtsim"` that has a single element - the data giving the draws from the simulation is returned.  In this case, `viztest.vtsim()` does the relevant testing.  
 #' @export
 #' 
 #' @examples
@@ -452,6 +459,9 @@ make_vt_data <- function(estimates, variances=NULL, type=c("est_var", "sim"), ..
       V <- diag(variances)
     }else{
       V <- variances
+    }
+    if(!is.positive.definite(V)){
+      stop("Variance-covariance matrix is not positive definite.  Cannot proceed with viztest().\n")
     }
     out <- structure(.Data = list(coef = estimates, vcov = V), class="vtcustom")
   }else{
