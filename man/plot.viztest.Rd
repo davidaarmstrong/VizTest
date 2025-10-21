@@ -7,17 +7,24 @@
 \method{plot}{viztest}(
   x,
   ...,
+  add_test_level = TRUE,
   ref_lines = "none",
   viz_diff_thresh = 0.02,
   make_plot = TRUE,
   level = c("ce", "max", "min", "median"),
-  trans = I
+  trans = I,
+  est_point_args = list(color = "black", size = 2),
+  opt_ci_args = list(),
+  test_ci_args = list(),
+  ref_line_args = list(color = "gray75", linetype = 3)
 )
 }
 \arguments{
 \item{x}{Object to be plotted, should be of class \code{viztest}}
 
 \item{...}{Other arguments passed down.  Currently not implemented.}
+
+\item{add_test_level}{Add the (1-test level) confidence interval to the plot.  For this to work, you must have specified \code{add_test_level} in the call to \code{viztest()} so that the appropriate confidence intervals can be calculated.}
 
 \item{ref_lines}{Reference lines to be plotted - one of "all", "ambiguous", "none".  This could also be a vector of stimulus names to plot - they should be the same as the names of the estimates in \code{x$est}. See details for explanation.}
 
@@ -28,6 +35,14 @@
 \item{level}{Level at which to plot the estimates.  Accepts both numeric entries or one of "ce", "max", "min", "median" - defaults to "ce", the cognitively easiest level.}
 
 \item{trans}{A function to transform the estimates and their confidence intervals like \code{plogis}.}
+
+\item{est_point_args}{A list of arguments to be passed to \code{geom_point()} that plots the point estimates.}
+
+\item{opt_ci_args}{A list of arguments to be passed to \code{geom_linerange()} to plot the optimal visual testing intervals.}
+
+\item{test_ci_args}{A list of arguments to be passed to \code{geom_linerange()} to plot the (1-test level) confidence intervals.}
+
+\item{ref_line_args}{A list of arguments to be passed to \code{geom_segment()} to plot the reference lines.}
 }
 \value{
 By default, a ggplot is returned.  If \code{make_plot = FALSE}, the data for the plot are returned, but the plot is not constructed.  If the data are returned, the following variables are in the dataset:
@@ -36,6 +51,7 @@ By default, a ggplot is returned.  If \code{make_plot = FALSE}, the data for the
 \item \code{est} - The parameter estimate
 \item \code{se} - The standard error of the estimate
 \item \code{lwr}, \code{upr} - The inferential confidence bounds being used
+\item \code{lwr_add}, \code{upr_add} - The confidence intervals that come from \code{add_level}.
 \item \code{label} - Factor giving the parameter names
 \item \code{stim_start}, \code{stim_end} - y-axis bounds of the reference line
 \item \code{bound_start}, \code{bound_end} - x-axis values for reference lines

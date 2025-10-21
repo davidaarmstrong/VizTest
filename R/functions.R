@@ -25,6 +25,7 @@ globalVariables(c("bound_end", "bound_start", "est", "label", "lwr", "stim_end",
 #'
 #' @param obj A model object (or any object) where `coef()` and `vcov()` return estimates of coefficients and sampling variability.
 #' @param test_level The type I error rate of the pairwise tests.
+#' @param add_test_level Captures the (1-test level) confidence interval to the output data.  Mainly used to add the standard interval (e.g., 95%) to the plot alongside the optimal visual testing interval in the plot. 
 #' @param range_levels The range of confidence levels to try.
 #' @param level_increment Step size of increase between the values of `range_levels`.
 #' @param adjust Multiplicity adjustment to use when calculating the p-values for normal theory pairwise tests.
@@ -58,6 +59,7 @@ globalVariables(c("bound_end", "bound_start", "est", "label", "lwr", "stim_end",
 #' 
 viztest <- function(obj,
                     test_level = 0.05,
+                    add_test_level = FALSE, 
                     range_levels = c(.25, .99),
                     level_increment = 0.01,
                     adjust = c("none", "holm", "hochberg", "hommel", "bonferroni", "BH", "BY", "fdr"),
@@ -75,6 +77,7 @@ viztest <- function(obj,
 #' @export
 viztest.default <- function(obj,
                      test_level = 0.05,
+                     add_test_level = FALSE,
                      range_levels = c(.25, .99),
                      level_increment = 0.01,
                      adjust = c("none", "holm", "hochberg", "hommel", "bonferroni", "BH", "BY", "fdr"),
@@ -155,6 +158,10 @@ viztest.default <- function(obj,
   est_data <- tibble(vbl = names(bhat), 
                      est = bhat, 
                      se = sqrt(diag(V)))
+  if(add_test_level){
+    est_data$lwr_add <- bhat - qt(1-test_level/2, resdf)*sqrt(diag(V))
+    est_data$upr_add <- bhat + qt(1-test_level/2, resdf)*sqrt(diag(V))
+  }
   res <- list(tab = res,
               pw_test = s,
               ci_tests = s_star,
@@ -164,6 +171,8 @@ viztest.default <- function(obj,
               U = U, 
               est = est_data)
   class(res) <- "viztest"
+  attr(res, "adjusted") <- adjust
+  attr(res, "test_level") <- test_level 
   return(res)
 }
 #' @importFrom stats quantile
@@ -172,6 +181,7 @@ viztest.default <- function(obj,
 #' @export
 viztest.vtsim <- function(obj,
                           test_level = 0.05,
+                          add_test_level = FALSE, 
                           range_levels = c(.25, .99),
                           level_increment = 0.01,
                           adjust = c("none", "holm", "hochberg", "hommel", "bonferroni", "BH", "BY", "fdr"),
@@ -204,10 +214,19 @@ viztest.vtsim <- function(obj,
   if(cif == "quantile"){
     L <- sapply(lev_seq, \(l)apply(est, 2, quantile, probs=((1-l)/2)))
     U <- sapply(lev_seq, \(l)apply(est, 2, quantile, probs=(1-(1-l)/2)))
+    if(add_test_level){
+      tl_L <- apply(est, 2, quantile, probs=(1 - (1 - test_level/2)))
+      tl_U <- apply(est, 2, quantile, probs=(1 - test_level / 2))
+    }
   }else{
     LU <- lapply(lev_seq, \(l)apply(est, 2, hdi, credMass = l))
     L <- sapply(LU, \(x)x[1,])
     U <- sapply(LU, \(x)x[2,])
+    if(add_test_level){
+      tl_LU <- apply(est, 2, quantile, hdi, credMass = 1-test_level)
+      tl_L <- sapply(tl_LU, \(x)x[1,])
+      tl_U <- sapply(tl_LU, \(x)x[2,])
+    }
   }
   s_star <- L[combs[1,], , drop=FALSE] >= U[combs[2,], , drop=FALSE]
   smat <- array(s, dim=dim(s_star))
@@ -243,6 +262,10 @@ viztest.vtsim <- function(obj,
   est_data <- tibble(vbl = names(cme), 
                      est = cme, 
                      sd = esd)
+  if(add_test_level){
+    est_data$lwr_add <- tl_L
+    est_data$upr_add <- tl_U
+  }
   res <- list(tab = res,
               pw_test = s,
               ci_tests = s_star,
@@ -252,6 +275,8 @@ viztest.vtsim <- function(obj,
               U = U, 
               est = est_data)
   class(res) <- "viztest"
+  attr(res, "adjusted") <- "none"
+  attr(res, "test_level") <- test_level 
   return(res)
 }
 
@@ -479,11 +504,16 @@ make_segs <- function(.data, vdt = .02, ...){
 #' 
 #' Plots the output of viztest objects with optional reference lines 
 #' @param x Object to be plotted, should be of class `viztest`
+#' @param add_test_level Add the (1-test level) confidence interval to the plot.  For this to work, you must have specified `add_test_level` in the call to `viztest()` so that the appropriate confidence intervals can be calculated.  
 #' @param ref_lines Reference lines to be plotted - one of "all", "ambiguous", "none".  This could also be a vector of stimulus names to plot - they should be the same as the names of the estimates in `x$est`. See details for explanation. 
 #' @param viz_diff_thresh Threshold for identifying visual difficulty, see details. 
 #' @param make_plot Logical indicating whether the plot should be constructed or the data returned. 
 #' @param level Level at which to plot the estimates.  Accepts both numeric entries or one of "ce", "max", "min", "median" - defaults to "ce", the cognitively easiest level.  
 #' @param trans A function to transform the estimates and their confidence intervals like `plogis`.
+#' @param est_point_args A list of arguments to be passed to `geom_point()` that plots the point estimates. 
+#' @param opt_ci_args A list of arguments to be passed to `geom_linerange()` to plot the optimal visual testing intervals. 
+#' @param test_ci_args A list of arguments to be passed to `geom_linerange()` to plot the (1-test level) confidence intervals.
+#' @param ref_line_args A list of arguments to be passed to `geom_segment()` to plot the reference lines.
 #' @param ... Other arguments passed down.  Currently not implemented.
 #' @details The `ref_lines` argument identifies what reference lines will be plotted in the figure.  For any particular stimulus, the reference lines run along the upper bound of the stimulus from the stimulus location to the most distant stimulus with overlapping confidence intervals.  
 #' When `ref_lines = "all"`, all lines are plotted, though in displays with many stimuli, this can make for a messy graph.  When `"ref_lines = ambiguous"` is specified, then only the ones that help discriminate in cases where the result might be visually difficult to discern are plotted. 
@@ -495,6 +525,7 @@ make_segs <- function(.data, vdt = .02, ...){
 #' * `est` - The parameter estimate
 #' * `se` - The standard error of the estimate
 #' * `lwr`, `upr` - The inferential confidence bounds being used
+#' * `lwr_add`, `upr_add` - The confidence intervals that come from `add_level`. 
 #' * `label` - Factor giving the parameter names
 #' * `stim_start`, `stim_end` - y-axis bounds of the reference line
 #' * `bound_start`, `bound_end` - x-axis values for reference lines
@@ -509,7 +540,18 @@ make_segs <- function(.data, vdt = .02, ...){
 #' plot(v, ref_lines="ambiguous") + ggplot2::theme_classic()
 #' 
 #' @export
-plot.viztest <- function(x, ..., ref_lines="none", viz_diff_thresh = .02, make_plot=TRUE, level=c("ce","max","min","median"),trans=I){
+plot.viztest <- function(x, 
+                         ..., 
+                         add_test_level = TRUE, 
+                         ref_lines="none", 
+                         viz_diff_thresh = .02, 
+                         make_plot=TRUE, 
+                         level=c("ce","max","min","median"),
+                         trans=I, 
+                         est_point_args = list(color="black", size=2), 
+                         opt_ci_args = list(),
+                         test_ci_args = list(),
+                         ref_line_args = list(color="gray75", linetype=3)){
   inp <- x$est
   tmp <- x$tab[which(x$tab$psame == max(x$tab$psame)), ]
   if(!is.numeric(level)){
@@ -537,19 +579,42 @@ plot.viztest <- function(x, ..., ref_lines="none", viz_diff_thresh = .02, make_p
   if(!make_plot){
     res <- inp
   }else{
+    if(add_test_level){
+      opt_ci_args$mapping <- aes(x=est, xmin=lwr, xmax=upr, y=label, 
+                                 colour=sprintf('Optimal Visual Intervals (%.1f%%)', level*100), 
+                                 linewidth=sprintf('Optimal Visual Intervals (%.1f%%)', level*100))
+      test_ci_args$mapping <- aes(xmin = lwr_add, xmax=upr_add, y=label, 
+                                  colour=sprintf('Standard Confidence Intervals (%.1f%%)', (1-attr(x, "test_level"))*100), 
+                                  linewidth=sprintf('Standard Confidence Intervals (%.1f%%)', (1-attr(x, "test_level"))*100))
+      lab_args <- list(x="Estimate", y= "Parameter", colour="", linewidth="")
+    }else{
+      opt_ci_args$mapping <- aes(x=est, xmin=lwr, xmax=upr, y=label)
+      lab_args <- list(x=sprintf("Estimate and Optimal Visual CI (%.1f%%)", 
+                               level*100), 
+                       y = "Parameter")
+    }
+    est_point_args$mapping <- aes(x=est, y=label)
+    ref_line_args$mapping <- aes(x=bound_start, xend=bound_end, y=stim_start, yend=stim_end)
     g <- ggplot(inp) + 
-      geom_pointrange(aes(x=est, xmin = lwr, xmax=upr, y=label), size=.01) 
+      do.call(geom_linerange, opt_ci_args) 
+    if(add_test_level & all(c("lwr_add", "upr_add") %in% colnames(inp))){
+      g <- g + do.call(geom_linerange, test_ci_args)
+    }
+    g <- g + do.call(geom_point, est_point_args)
     if("all" %in% ref_lines){
-      g <- g + geom_segment(aes(x=bound_start, xend=bound_end, y=stim_start, yend=stim_end), color="gray75", linetype=3)
+      g <- g + do.call(geom_segment, ref_line_args)
     }  
     if( "ambiguous" %in% ref_lines){
-      g <- g + geom_segment(data = inp[which(inp$ambiguous), ], aes(x=bound_start, xend=bound_end, y=stim_start, yend=stim_end), color="gray75", linetype=3)
+      ref_line_args$data <- inp[which(inp$ambiguous), ]
+      g <- g + do.call(geom_segment, ref_line_args)
     }
     if(!any(c("ambiguous", "all", "none") %in% ref_lines)){
       incl <- which(ref_lines %in% inp$vbl)
       if(length(incl) == 0)stop("ref_lines should either be one of (all, ambiguous, or none) or a vector of names consistent with x$est$vbl.\n")
-      g <- g + geom_segment(data = inp[incl, ], aes(x=bound_start, xend=bound_end, y=stim_start, yend=stim_end), color="gray75", linetype=3)
+      ref_line_args$data <- inp[incl, ]
+      g <- g + do.call(geom_segment, ref_line_args)
     }
+    g <- g + do.call(labs, lab_args)
     res <- g
   }
   return(res)
@@ -667,3 +732,29 @@ gen_z <- function(b, v, alpha=.05, df = Inf, ...){
   return(list(ave_z = tmp, all_z = eg))
 }
 
+
+
+
+adj_ci_from_p <- function(est, se, alpha = 0.05, method = c("bonferroni","holm","hochberg","hommel"),
+                          df = Inf) {
+  method <- match.arg(method)
+  # z/t quantile function
+  qf <- if (is.infinite(df)) qnorm else function(p) qt(p, df)
+  
+  # raw two-sided p-values
+  z <- est / se
+  p_raw <- if (is.infinite(df)) 2 * (1 - pnorm(abs(z))) else 2 * (1 - pt(abs(z), df))
+  
+  # adjust p-values
+  p_adj <- p.adjust(p_raw, method = method)
+  
+  # invert adjusted p-values to get per-estimate cutoffs
+  crit <- qf(1 - p_adj/2)
+  data.frame(
+    est, se, p_raw, p_adj,
+    lower = est - crit * se,
+    upper = est + crit * se,
+    method = paste0("invert-", method),
+    alpha = alpha
+  )
+}

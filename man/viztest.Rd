@@ -7,6 +7,7 @@
 viztest(
   obj,
   test_level = 0.05,
+  add_test_level = FALSE,
   range_levels = c(0.25, 0.99),
   level_increment = 0.01,
   adjust = c("none", "holm", "hochberg", "hommel", "bonferroni", "BH", "BY", "fdr"),
@@ -21,6 +22,8 @@ viztest(
 \item{obj}{A model object (or any object) where \code{coef()} and \code{vcov()} return estimates of coefficients and sampling variability.}
 
 \item{test_level}{The type I error rate of the pairwise tests.}
+
+\item{add_test_level}{Captures the (1-test level) confidence interval to the output data.  Mainly used to add the standard interval (e.g., 95\%) to the plot alongside the optimal visual testing interval in the plot.}
 
 \item{range_levels}{The range of confidence levels to try.}
 
