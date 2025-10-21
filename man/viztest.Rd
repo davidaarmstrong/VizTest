@@ -15,6 +15,7 @@ viztest(
   include_intercept = FALSE,
   include_zero = TRUE,
   sig_diffs = NULL,
+  tol = 1e-06,
   ...
 )
 }
@@ -38,6 +39,8 @@ viztest(
 \item{include_zero}{Should univariate tests at zero be included, defaults to \code{TRUE}.}
 
 \item{sig_diffs}{An optional vector of values identify whether each pair of values is statistically different (1) or not (0).  See Details for more information on specifying this value; there is some added complexity here.}
+
+\item{tol}{Tolerance for evaluation of symmetry and positive definiteness.}
 
 \item{...}{Other arguments, currently not implemented.}
 }

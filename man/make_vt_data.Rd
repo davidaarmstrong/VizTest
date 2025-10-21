@@ -4,7 +4,13 @@
 \alias{make_vt_data}
 \title{Make custom visual testing data}
 \usage{
-make_vt_data(estimates, variances = NULL, type = c("est_var", "sim"), ...)
+make_vt_data(
+  estimates,
+  variances = NULL,
+  type = c("est_var", "sim"),
+  tol = 1e-08,
+  ...
+)
 }
 \arguments{
 \item{estimates}{A vector of estimates if type is \code{"est_var"} and or a number of simulations by
@@ -19,6 +25,8 @@ raw variances from the data.}
 
 \item{type}{Indicates the type of input data either estimates with variances or a variance-covariance matrix or data from
 a simulation.}
+
+\item{tol}{Tolerance for evaluation of symmetry and positive definiteness.}
 
 \item{...}{Other arguments passed down, currently not implemented.}
 }

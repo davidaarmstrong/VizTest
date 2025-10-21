@@ -316,7 +316,8 @@ vt_titanic <- viztest(mes,
         test_level = 0.05, 
         range_levels = c(0.25,0.99),
         level_increment = 0.01, 
-        include_zero=FALSE)
+        include_zero=FALSE, 
+        tol=1e-06)
 
 vt_titanic
 ```

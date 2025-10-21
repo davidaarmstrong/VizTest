@@ -1,0 +1,59 @@
+---
+title: "VizTest: Using the sig_diffs Template"
+date: "2025-03-10"
+author:  
+  - name: William Poirier
+    affiliation: Western University
+    address:
+    - Department of Political Science
+    - London, Canada
+    url: https://williampo1.github.io/
+    orcid: 0000-0002-3274-1351
+    email:  wpoirier@uwo.ca
+  - name: David A. Armstrong
+    affiliation:
+    - Western University
+    address:
+    - Department of Political Science
+    - London, Canada
+    email: dave.armstrong@uwo.ca
+bibliography: RJreferences.bib
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{VizTest: Optimal Confidence Intervals for Visual Testing}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
+library(VizTest)
+library(carData)
+library(dplyr)
+library(tidyr)
+```
+
+The `viztest()` function in the `VizTest` pacakge will calculate all pairwise tests using normal theory tests (potentially adjusted for multiplicity if the user elects to do so).  We image there are
+use cases where users derive the significance of differences using some procedure that is not anticipated by the workflow in the package.  We give users who do this the option to input a vector indicating which pairs are significantly different with the `sig_diffs` argument.  This gets somewhat complex, though so we walk through an example below.  Consider the following regression model: 
+
+```{r}
+library(VizTest)
+data(iris)
+mod <- lm(Petal.Width ~ Species, data = iris) 
+summary(mod)
+v <- viztest(mod)
+library(marginaleffects)
+preds <- avg_predictions(mod, variables="Species")
+#v <- viztest(preds)
+```
+
+
+
+

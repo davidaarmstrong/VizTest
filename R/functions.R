@@ -33,13 +33,13 @@ globalVariables(c("bound_end", "bound_start", "est", "label", "lwr", "stim_end",
 #' @param include_intercept Logical indicating whether the intercept should be included in the tests, defaults to `FALSE`.
 #' @param include_zero Should univariate tests at zero be included, defaults to `TRUE`.
 #' @param sig_diffs An optional vector of values identify whether each pair of values is statistically different (1) or not (0).  See Details for more information on specifying this value; there is some added complexity here. 
+#' @param tol Tolerance for evaluation of symmetry and positive definiteness. 
 #' @param ... Other arguments, currently not implemented.
 #' @export
 #' 
 #' @references David A. Armstrong II and William Poirier. "Decoupling Visualization and Testing when Presenting Confidence Intervals" Political Analysis <doi:10.1017/pan.2024.24>.
 #' @importFrom stats coef vcov qt pt p.adjust
 #' @importFrom utils combn
-#' @importFrom matrixcalc is.positive.definite
 #' @importFrom multcomp glht adjusted
 #' @importFrom dplyr left_join 
 #' @returns A list (of class "viztest") with the following elements: 
@@ -70,6 +70,7 @@ viztest <- function(obj,
                     include_intercept = FALSE,
                     include_zero = TRUE,
                     sig_diffs = NULL,
+                    tol = 1e-06,
                     ...){
   UseMethod("viztest")
 }
@@ -88,7 +89,9 @@ viztest.default <- function(obj,
                      include_intercept = FALSE,
                      include_zero = TRUE,
                      sig_diffs = NULL,
+                     tol = 1e-08,
                      ...){
+  
   adj <- match.arg(adjust)
   lev_seq <- seq(range_levels[1], range_levels[2], by=level_increment)
   resdf <- Inf
@@ -98,10 +101,10 @@ viztest.default <- function(obj,
   bhat <- coef(obj)
   if(is.null(names(bhat)))names(bhat) <- 1:length(bhat)
   V <- vcov(obj)
-  if(!is.positive.definite(V)){
+  if(!is_pd(V, tol=tol)){
     stop("Variance-covariance matrix is not positive definite.  Cannot proceed with viztest().\n")
   }
-  if(!(length(bhat) == nrow(V) & isSymmetric(V))){
+  if(!(length(bhat) == nrow(V) & is_sym(V, tol=tol))){
     stop("Length of coefficient vector does not match dimensions of variance-covariance matrix.  Cannot proceed with viztest().\n")
   }
   if(!include_intercept){
@@ -215,7 +218,8 @@ viztest.vtsim <- function(obj,
                           cifun = c("quantile", "hdi"), 
                           include_intercept = FALSE,
                           include_zero = TRUE,
-                          sig_diffs = NULL, 
+                          sig_diffs = NULL,
+                          tol = 1e-08, 
                           ...){
   cif <- match.arg(cifun)
   est <- obj$est
@@ -442,6 +446,7 @@ print.viztest <- function(x, ..., best=TRUE, missed_tests=TRUE, level=NULL){
 #' raw variances from the data. 
 #' @param type Indicates the type of input data either estimates with variances or a variance-covariance matrix or data from
 #' a simulation. 
+#' @param tol Tolerance for evaluation of symmetry and positive definiteness. 
 #' @param ... Other arguments passed down, currently not implemented. 
 #' @returns 
 #' 1. If the input is a vector of parameter estimates and a variance-covariance matrix, then a list with estimates and a variance-covariance matrix of class `"vtcustom"` is returned.  In this case, the functionms `coef.vtcustom()` and `vcov.vtcustom()` are 
@@ -461,7 +466,7 @@ print.viztest <- function(x, ..., best=TRUE, missed_tests=TRUE, level=NULL){
 #'         test_level = .025, 
 #'         include_intercept = FALSE, 
 #'         include_zero = FALSE)
-make_vt_data <- function(estimates, variances=NULL, type=c("est_var", "sim"), ...){
+make_vt_data <- function(estimates, variances=NULL, type=c("est_var", "sim"), tol = 1e-08, ...){
   typ <- match.arg(type)
   if(typ == "est_var"){
     if(is.null(variances)){
@@ -480,7 +485,7 @@ make_vt_data <- function(estimates, variances=NULL, type=c("est_var", "sim"), ..
     }else{
       V <- variances
     }
-    if(!is.positive.definite(V)){
+    if(!is_pd(V, tol=tol)){
       stop("Variance-covariance matrix is not positive definite.  Cannot proceed with viztest().\n")
     }
     out <- structure(.Data = list(coef = estimates, vcov = V), class="vtcustom")
@@ -766,5 +771,30 @@ gen_z <- function(b, v, alpha=.05, df = Inf, ...){
 }
 
 
+#' Internal function to check for symmetry
+#' @noRd
+is_sym <- function(x, tol=1e-16){
+  rnd <- abs(floor(log10(abs(tol))))
+  x <- round(x,rnd)
+  sqr <- nrow(x) == ncol(x) 
+  if(sqr){
+    lt_ut <- all(x[lower.tri(x)] == t(x)[lower.tri(x)])
+  }else{
+    lt_ut <- FALSE
+  }
+  lt_ut
+}
+
+#' Internal function to check for positive definiteness
+#' @noRd
+is_pd <- function(x, tol=1e-16){
+  if(is_sym(x) & is.numeric(x)){
+    ev <- eigen(x, only.values = TRUE)$values
+    ev <- ifelse(abs(ev) < tol, 0, ev)
+    !any(ev < 0)
+  }else{
+    FALSE
+  }
+}
 
 
