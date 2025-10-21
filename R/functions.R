@@ -40,6 +40,8 @@ globalVariables(c("bound_end", "bound_start", "est", "label", "lwr", "stim_end",
 #' @importFrom stats coef vcov qt pt p.adjust
 #' @importFrom utils combn
 #' @importFrom matrixcalc is.positive.definite
+#' @importFrom multcomp glht adjusted
+#' @importFrom dplyr left_join 
 #' @returns A list (of class "viztest") with the following elements: 
 #' 1. tab: a data frame with results from the grid search.  The data frame has four variables: `level` - is the confidence level used in the grid search; `psame` - the proportion of (non-)overlaps that match the 
 #' normal theory tests; `pdiff` - the proportion of pairwise tests that are statistically significant; `easy` - the ease with which the comparisons are made. 
@@ -166,8 +168,26 @@ viztest.default <- function(obj,
                      est = bhat, 
                      se = sqrt(diag(V)))
   if(add_test_level){
-    est_data$lwr_add <- bhat - qt(1-test_level/2, resdf)*sqrt(diag(V))
-    est_data$upr_add <- bhat + qt(1-test_level/2, resdf)*sqrt(diag(V))
+    if(adj == "none"){
+      est_data$lwr_add <- bhat - qt(1-test_level/2, resdf)*sqrt(diag(V))
+      est_data$upr_add <- bhat + qt(1-test_level/2, resdf)*sqrt(diag(V))
+    }else{
+      if("zero" %in% names(bhat)){
+        tmp_bhat <- bhat
+        tmp_V <- V
+        zero_ind <- which(names(bhat) == "zero")
+        tmp_bhat <- bhat[-zero_ind]
+        tmp_V <- V[-zero_ind, -zero_ind]
+      }
+      K <- diag(length(tmp_bhat))
+      g <- glht(model = NULL, linfct = K, coef.=tmp_bhat, vcov.=tmp_V)
+      s <- summary(g, test=adjusted(adj))
+      cis <- confint(s)
+      dat_add <- data.frame(vbl = names(tmp_bhat), 
+                            lwr_add = cis$confint[,"lwr"], 
+                            upr_add = cis$confint[,"upr"])
+      est_data <- left_join(est_data, dat_add, by="vbl")
+    }    
   }
   res <- list(tab = res,
               pw_test = s,
@@ -748,26 +768,3 @@ gen_z <- function(b, v, alpha=.05, df = Inf, ...){
 
 
 
-adj_ci_from_p <- function(est, se, alpha = 0.05, method = c("bonferroni","holm","hochberg","hommel"),
-                          df = Inf) {
-  method <- match.arg(method)
-  # z/t quantile function
-  qf <- if (is.infinite(df)) qnorm else function(p) qt(p, df)
-  
-  # raw two-sided p-values
-  z <- est / se
-  p_raw <- if (is.infinite(df)) 2 * (1 - pnorm(abs(z))) else 2 * (1 - pt(abs(z), df))
-  
-  # adjust p-values
-  p_adj <- p.adjust(p_raw, method = method)
-  
-  # invert adjusted p-values to get per-estimate cutoffs
-  crit <- qf(1 - p_adj/2)
-  data.frame(
-    est, se, p_raw, p_adj,
-    lower = est - crit * se,
-    upper = est + crit * se,
-    method = paste0("invert-", method),
-    alpha = alpha
-  )
-}
