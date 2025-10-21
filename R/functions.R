@@ -514,6 +514,7 @@ make_segs <- function(.data, vdt = .02, ...){
 #' @param opt_ci_args A list of arguments to be passed to `geom_linerange()` to plot the optimal visual testing intervals. 
 #' @param test_ci_args A list of arguments to be passed to `geom_linerange()` to plot the (1-test level) confidence intervals.
 #' @param ref_line_args A list of arguments to be passed to `geom_segment()` to plot the reference lines.
+#' @param remove_caption Logical indicating whether caption should be removed.  By default, it is printed to alert the user. 
 #' @param ... Other arguments passed down.  Currently not implemented.
 #' @details The `ref_lines` argument identifies what reference lines will be plotted in the figure.  For any particular stimulus, the reference lines run along the upper bound of the stimulus from the stimulus location to the most distant stimulus with overlapping confidence intervals.  
 #' When `ref_lines = "all"`, all lines are plotted, though in displays with many stimuli, this can make for a messy graph.  When `"ref_lines = ambiguous"` is specified, then only the ones that help discriminate in cases where the result might be visually difficult to discern are plotted. 
@@ -532,7 +533,7 @@ make_segs <- function(.data, vdt = .02, ...){
 #' * `ambiguous` - Logical vector indicating whether the comparison is considered "ambiguous". 
 #' @method plot viztest
 #' @importFrom dplyr left_join arrange `%>%` join_by
-#' @importFrom ggplot2 ggplot geom_pointrange geom_segment aes
+#' @importFrom ggplot2 ggplot geom_pointrange geom_segment aes labs geom_point geom_linerange
 #' @examples
 #' data(mtcars)
 #' mod2 <- lm(mpg ~ as.factor(cyl) + vs + am + as.factor(gear), data = mtcars)
@@ -551,7 +552,8 @@ plot.viztest <- function(x,
                          est_point_args = list(color="black", size=2), 
                          opt_ci_args = list(),
                          test_ci_args = list(),
-                         ref_line_args = list(color="gray75", linetype=3)){
+                         ref_line_args = list(color="gray75", linetype=3), 
+                         remove_caption=FALSE){
   inp <- x$est
   tmp <- x$tab[which(x$tab$psame == max(x$tab$psame)), ]
   if(!is.numeric(level)){
@@ -614,6 +616,7 @@ plot.viztest <- function(x,
       ref_line_args$data <- inp[incl, ]
       g <- g + do.call(geom_segment, ref_line_args)
     }
+    if(!remove_caption)lab_args$caption <- "Confidence intervals have been adjusted to permit visual testing as per Armstrong and Poirier (2025) <doi:10.1017/pan.2024.24>"
     g <- g + do.call(labs, lab_args)
     res <- g
   }

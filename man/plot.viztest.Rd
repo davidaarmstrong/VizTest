@@ -16,7 +16,8 @@
   est_point_args = list(color = "black", size = 2),
   opt_ci_args = list(),
   test_ci_args = list(),
-  ref_line_args = list(color = "gray75", linetype = 3)
+  ref_line_args = list(color = "gray75", linetype = 3),
+  remove_caption = FALSE
 )
 }
 \arguments{
@@ -43,6 +44,8 @@
 \item{test_ci_args}{A list of arguments to be passed to \code{geom_linerange()} to plot the (1-test level) confidence intervals.}
 
 \item{ref_line_args}{A list of arguments to be passed to \code{geom_segment()} to plot the reference lines.}
+
+\item{remove_caption}{Logical indicating whether caption should be removed.  By default, it is printed to alert the user.}
 }
 \value{
 By default, a ggplot is returned.  If \code{make_plot = FALSE}, the data for the plot are returned, but the plot is not constructed.  If the data are returned, the following variables are in the dataset:
