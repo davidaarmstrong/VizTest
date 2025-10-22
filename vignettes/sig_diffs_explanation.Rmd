@@ -20,7 +20,7 @@ author:
 bibliography: RJreferences.bib
 output: rmarkdown::html_vignette
 vignette: >
-  %\VignetteIndexEntry{VizTest: Optimal Confidence Intervals for Visual Testing}
+  %\VignetteIndexEntry{VizTest: Using the sig_diffs Template}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
@@ -50,10 +50,57 @@ mod <- lm(Petal.Width ~ Species, data = iris)
 summary(mod)
 v <- viztest(mod)
 library(marginaleffects)
-preds <- avg_predictions(mod, variables="Species")
-#v <- viztest(preds)
+preds <- avg_predictions(mod, variables="Species", conf_level = .9999)
+preds
+
+data(esoph)
+esoph$agegp <- as.factor(as.character(esoph$agegp))
+esoph$tobgp <- factor(as.character(esoph$tobgp), levels=c("0-9g/day", "10-19", "20-29", "30+"))
+esoph$alcgp <- factor(as.character(esoph$alcgp), levels=c("0-39g/day", "40-79", "80-119", "120+"))
+
+model1 <- glm(cbind(ncases, ncontrols) ~ agegp + tobgp + alcgp,
+              data = esoph, family = binomial())
+preds <- avg_predictions(model1, variables = "tobgp")
 ```
 
+Let's imagine, for the sake of argument that I had a different way of identifying whether there are significant differences between the estimates presented above.  I could use `make_diff_template()` to create a template for inputting these differences.  Note that this also taked `include_intercept` and `include_zero` logical arguments that must be the same as the ones you will specify in `viztest()`.  Let'see how it works.  The first thing we need to do is make a vector of the estimates and apply the appropriate names: 
+
+```{r}
+ests <- preds$estimate
+names(ests) <- preds$tobgp
+```
+
+Next, we give that vector to `make_diff_template()`.
+
+```{r}
+tmpl <- make_diff_template(ests, include_intercept = FALSE, include_zero = FALSE)
+tmpl
+```
+
+At this point, we could make a vector of zeros and ones indicating whether there is a significant difference between the two stimuli.  
+
+```{r}
+diff <- c(1,1,1, 0, 0,0)
+```
+
+You could add that to the template and print it to ensure you did it right. 
+
+```{r}
+tmpl$sig <- diff
+tmpl
+```
+
+Alternatively, you could export `tmpl` to a CSV file or similar, input by hand the significant differences and read the completed file back in.  You would then use the vector of zeros and ones from the imported CSV file as the `sig_diffs` argument to `viztest()`.
+
+If everything looks alright, you can use this in the `viztest()` function: 
+
+```{r}
+viztest(preds, include_zero=FALSE, include_intercept = FALSE, sig_diffs = diff,range_levels = c(.25, .999))
+```
+
+What we see is that any confidence level between $78\%$ and $96\%$ will have (non-)overlaps that correspond with the pairwise differences we specified.  Just so you can see this is different, let's do it without the `sig_diffs` argument:
 
 
-
+```{r}
+viztest(preds, include_zero=FALSE, include_intercept = FALSE)
+```

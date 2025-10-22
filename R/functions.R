@@ -184,8 +184,8 @@ viztest.default <- function(obj,
       }
       K <- diag(length(tmp_bhat))
       g <- glht(model = NULL, linfct = K, coef.=tmp_bhat, vcov.=tmp_V)
-      s <- summary(g, test=adjusted(adj))
-      cis <- confint(s)
+      smry <- summary(g, test=adjusted(adj))
+      cis <- confint(smry)
       dat_add <- data.frame(vbl = names(tmp_bhat), 
                             lwr_add = cis$confint[,"lwr"], 
                             upr_add = cis$confint[,"upr"])
@@ -201,7 +201,7 @@ viztest.default <- function(obj,
               U = U, 
               est = est_data)
   class(res) <- "viztest"
-  attr(res, "adjusted") <- adjust
+  attr(res, "adjusted") <- adj
   attr(res, "test_level") <- test_level 
   return(res)
 }
@@ -254,9 +254,9 @@ viztest.vtsim <- function(obj,
     L <- sapply(LU, \(x)x[1,])
     U <- sapply(LU, \(x)x[2,])
     if(add_test_level){
-      tl_LU <- apply(est, 2, quantile, hdi, credMass = 1-test_level)
-      tl_L <- sapply(tl_LU, \(x)x[1,])
-      tl_U <- sapply(tl_LU, \(x)x[2,])
+      tl_LU <- apply(est, 2,  hdi, credMass = 1-test_level)
+      tl_L <- tl_LU[1,]
+      tl_U <- tl_LU[2,]
     }
   }
   s_star <- L[combs[1,], , drop=FALSE] >= U[combs[2,], , drop=FALSE]
@@ -773,7 +773,7 @@ gen_z <- function(b, v, alpha=.05, df = Inf, ...){
 
 #' Internal function to check for symmetry
 #' @noRd
-is_sym <- function(x, tol=1e-16){
+is_sym <- function(x, tol=1e-08){
   rnd <- abs(floor(log10(abs(tol))))
   x <- round(x,rnd)
   sqr <- nrow(x) == ncol(x) 
@@ -787,8 +787,8 @@ is_sym <- function(x, tol=1e-16){
 
 #' Internal function to check for positive definiteness
 #' @noRd
-is_pd <- function(x, tol=1e-16){
-  if(is_sym(x) & is.numeric(x)){
+is_pd <- function(x, tol=1e-08){
+  if(is_sym(x, tol = tol) & is.numeric(x)){
     ev <- eigen(x, only.values = TRUE)$values
     ev <- ifelse(abs(ev) < tol, 0, ev)
     !any(ev < 0)

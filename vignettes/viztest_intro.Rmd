@@ -356,10 +356,10 @@ post <- draws %>%
   group_by(ageCat, sex) %>% 
   mutate(condition = cur_group_id()) %>%
   ungroup %>% 
-  select(drawid, draw, condition) %>% 
+  dplyr::select(drawid, draw, condition) %>% 
   pivot_wider(names_from = condition, values_from = draw, 
               names_prefix = "b") %>%
-  select(-drawid) %>% 
+  dplyr::select(-drawid) %>% 
   as.matrix()
 post_vt <- make_vt_data(post, type="sim")
 vt_sim <- viztest(post_vt, cifun="hdi", include_zero=FALSE)
