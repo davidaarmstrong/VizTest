@@ -25,7 +25,6 @@ globalVariables(c("bound_end", "bound_start", "est", "label", "lwr", "stim_end",
 #'
 #' @param obj A model object (or any object) where `coef()` and `vcov()` return estimates of coefficients and sampling variability.
 #' @param test_level The type I error rate of the pairwise tests.
-#' @param add_test_level Captures the (1-test level) confidence interval to the output data.  Mainly used to add the standard interval (e.g., 95%) to the plot alongside the optimal visual testing interval in the plot. 
 #' @param range_levels The range of confidence levels to try.
 #' @param level_increment Step size of increase between the values of `range_levels`.
 #' @param adjust Multiplicity adjustment to use when calculating the p-values for normal theory pairwise tests.
@@ -63,7 +62,6 @@ globalVariables(c("bound_end", "bound_start", "est", "label", "lwr", "stim_end",
 #' 
 viztest <- function(obj,
                     test_level = 0.05,
-                    add_test_level = FALSE, 
                     range_levels = c(.25, .99),
                     level_increment = 0.01,
                     adjust = c("none", "holm", "hochberg", "hommel", "bonferroni", "BH", "BY", "fdr"),
@@ -82,7 +80,6 @@ viztest <- function(obj,
 #' @export
 viztest.default <- function(obj,
                      test_level = 0.05,
-                     add_test_level = FALSE,
                      range_levels = c(.25, .99),
                      level_increment = 0.01,
                      adjust = c("none", "holm", "hochberg", "hommel", "bonferroni", "BH", "BY", "fdr"),
@@ -171,28 +168,26 @@ viztest.default <- function(obj,
   est_data <- tibble(vbl = names(bhat), 
                      est = bhat, 
                      se = sqrt(diag(V)))
-  if(add_test_level){
-    if(adj == "none"){
-      est_data$lwr_add <- bhat - qt(1-test_level/2, resdf)*sqrt(diag(V))
-      est_data$upr_add <- bhat + qt(1-test_level/2, resdf)*sqrt(diag(V))
-    }else{
-      if("zero" %in% names(bhat)){
-        tmp_bhat <- bhat
-        tmp_V <- V
-        zero_ind <- which(names(bhat) == "zero")
-        tmp_bhat <- bhat[-zero_ind]
-        tmp_V <- V[-zero_ind, -zero_ind]
-      }
-      K <- diag(length(tmp_bhat))
-      g <- glht(model = NULL, linfct = K, coef.=tmp_bhat, vcov.=tmp_V)
-      smry <- summary(g, test=adjusted(adj))
-      cis <- confint(smry)
-      dat_add <- data.frame(vbl = names(tmp_bhat), 
-                            lwr_add = cis$confint[,"lwr"], 
-                            upr_add = cis$confint[,"upr"])
-      est_data <- left_join(est_data, dat_add, by="vbl")
-    }    
-  }
+  if(adj == "none"){
+    est_data$lwr_add <- bhat - qt(1-test_level/2, resdf)*sqrt(diag(V))
+    est_data$upr_add <- bhat + qt(1-test_level/2, resdf)*sqrt(diag(V))
+  }else{
+    if("zero" %in% names(bhat)){
+      tmp_bhat <- bhat
+      tmp_V <- V
+      zero_ind <- which(names(bhat) == "zero")
+      tmp_bhat <- bhat[-zero_ind]
+      tmp_V <- V[-zero_ind, -zero_ind]
+    }
+    K <- diag(length(tmp_bhat))
+    g <- glht(model = NULL, linfct = K, coef.=tmp_bhat, vcov.=tmp_V)
+    smry <- summary(g, test=adjusted(adj))
+    cis <- confint(smry)
+    dat_add <- data.frame(vbl = names(tmp_bhat), 
+                          lwr_add = cis$confint[,"lwr"], 
+                          upr_add = cis$confint[,"upr"])
+    est_data <- left_join(est_data, dat_add, by="vbl")
+  }    
   res <- list(tab = res,
               pw_test = s,
               ci_tests = s_star,
@@ -213,7 +208,6 @@ viztest.default <- function(obj,
 #' @export
 viztest.vtsim <- function(obj,
                           test_level = 0.05,
-                          add_test_level = FALSE, 
                           range_levels = c(.25, .99),
                           level_increment = 0.01,
                           adjust = c("none", "holm", "hochberg", "hommel", "bonferroni", "BH", "BY", "fdr"),
@@ -295,10 +289,8 @@ viztest.vtsim <- function(obj,
   est_data <- tibble(vbl = names(cme), 
                      est = cme, 
                      sd = esd)
-  if(add_test_level){
-    est_data$lwr_add <- tl_L
-    est_data$upr_add <- tl_U
-  }
+  est_data$lwr_add <- tl_L
+  est_data$upr_add <- tl_U
   res <- list(tab = res,
               pw_test = s,
               ci_tests = s_star,
@@ -613,10 +605,7 @@ plot.viztest <- function(x,
   segs$vbl <- rownames(segs)
   inp$label <- factor(1:nrow(inp), labels=inp$vbl)
   inp <- left_join(inp, segs, by=join_by(vbl))
-  cols <- ifelse(add_test_level,
-                 c("est","lwr","upr","lwr_add","upr_add","bound_start","bound_end"),
-                 c("est","lwr","upr","bound_start","bound_end"))
-  inp[,cols] <- apply(inp[,cols],2,trans)
+  inp[,c("est","lwr","upr","lwr_add","upr_add","bound_start","bound_end")] <- apply(inp[,c("est","lwr","upr","lwr_add","upr_add","bound_start","bound_end")],2,trans)
   if(any(inp$vbl == "zero"))inp <- inp[-which(inp$vbl == "zero"), ]
   if(!make_plot){
     res <- inp
