@@ -792,3 +792,32 @@ is_pd <- function(x, tol=1e-08){
 }
 
 
+#' Get Letters for Multiple Comparisons
+#' 
+#' Gets the letter matrix for a compact letter display.  This can be passed to the `letter_plot()` function from the `psre` package to produce plots of 
+#' confidence intervals with a letter display.  
+#' 
+#' @param x An object that is compatible with the `glht()` function
+#' @param linfct The linear function contrasts to be used in the multiple comparisons.
+#' @param ... Arguments to be passed down to `glht()` or `summary.glht()`.  Arguments for the former include `coef.`, `vcov.`, and `df`.  
+#' Arguments for the latter include `test` and a host of others.  See the help file for `summary.glht` for examples. 
+#' 
+#' @export
+#' 
+#' @importFrom multcomp glht cld
+get_letters <- function(x, linfct, ...){
+  args <- list(...)
+  if(any(names(args) %in% c("coef.", "vcov.", "df"))){
+    g_args <- args[intersect(names(args),c("coef.", "vcov.", "df"))]
+    args[intersect(names(args),c("coef.", "vcov.", "df"))] <- NULL
+  }else{
+    g_args <- list()
+  }
+  g_args$model <- x
+  g_args$linfct <- linfct
+  g <- do.call(glht, g_args)
+  args$object <- g
+  s <- do.call(summary, args)
+  cl <- cld(s)
+  cl$mcletters$LetterMatrix
+}
