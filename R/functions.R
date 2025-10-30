@@ -817,3 +817,51 @@ get_letters <- function(x, linfct, ...){
   cl <- cld(s)
   cl$mcletters$LetterMatrix
 }
+
+#' Make Annotations for Significance Brackets
+#' 
+#' Makes a list of annotations for significance brakcets produced by the `geom_signif()` function from the `ggsignif` package.  The annotations are added for 
+#' pairs of estimates whose confidence intervals overlap, but the estimates are nonetheless significantly different from each other.  
+#' 
+#' @param obj An object of class `viztest` produced by the `viztest()` function.
+#' @param tol Tolerance for determining whether intervals are close enough to be considered ambiguous.  This also plots significance flags for intervals that 
+#' do not overlap, but the distance between them is smaller than the tolerance.  The default is zero, but increasing the value will potentially produce more significance flags. 
+#' @param nudge A vector of the same length as the number of brackets.  This will nudge the y-position of the brakcet by the indicated amount.  This will be difficult to 
+#' specify ahead of time, but can be specified to clean up a plot after an initial run. 
+#' @param ... Other arguments, currently ignored. 
+#' 
+#' @export
+make_annotations <- function(obj, tol = 0, nudge=NULL, ...){
+  if(!"lwr_add" %in% names(obj$est)){
+    obj$call[[1L]] <- as.name("viztest")
+    obj <- update(obj, add_test_level=TRUE)
+  }
+  lwr <- obj$est$lwr_add
+  names(lwr) <- obj$est$vbl
+  upr <- obj$est$upr_add
+  names(upr) <- obj$est$vbl
+  rng <- max(upr) - min(lwr)
+  tmp_combs <- data.frame(
+    smaller = obj$param_names[obj$combs[2,]], 
+    larger = obj$param_names[obj$combs[1,]] 
+  ) %>% 
+    mutate(us = upr[smaller], 
+           ll = lwr[larger],
+           ul = upr[larger], 
+           s = obj$pw_test, 
+           olap = ll < us, 
+           ambig = ll > us & (ll - us) <= tol) %>%
+    filter(s & (olap | ambig))
+  if(is.null(nudge))nudge <- rep(0, nrow(tmp_combs))
+  if(length(nudge) != nrow(tmp_combs)){
+    warning("nudge must be NULL or same length as number of annotations, currently ignored")
+    nudge <- rep(0, nrow(tmp_combs))
+  } 
+  list(
+    annotations = rep("*", nrow(tmp_combs)), 
+    y_position = tmp_combs$ul + .05*rng + nudge, 
+    xmin = tmp_combs$smaller, 
+    xmax = tmp_combs$larger
+  )
+}
+
