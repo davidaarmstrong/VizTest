@@ -241,19 +241,15 @@ viztest.vtsim <- function(obj,
   if(cif == "quantile"){
     L <- sapply(lev_seq, \(l)apply(est, 2, quantile, probs=((1-l)/2)))
     U <- sapply(lev_seq, \(l)apply(est, 2, quantile, probs=(1-(1-l)/2)))
-    if(add_test_level){
-      tl_L <- apply(est, 2, quantile, probs=(1 - (1 - test_level/2)))
-      tl_U <- apply(est, 2, quantile, probs=(1 - test_level / 2))
-    }
+    tl_L <- apply(est, 2, quantile, probs=(1 - (1 - test_level/2)))
+    tl_U <- apply(est, 2, quantile, probs=(1 - test_level / 2))
   }else{
     LU <- lapply(lev_seq, \(l)apply(est, 2, hdi, credMass = l))
     L <- sapply(LU, \(x)x[1,])
     U <- sapply(LU, \(x)x[2,])
-    if(add_test_level){
-      tl_LU <- apply(est, 2,  hdi, credMass = 1-test_level)
-      tl_L <- tl_LU[1,]
-      tl_U <- tl_LU[2,]
-    }
+    tl_LU <- apply(est, 2,  hdi, credMass = 1-test_level)
+    tl_L <- tl_LU[1,]
+    tl_U <- tl_LU[2,]
   }
   s_star <- L[combs[1,], , drop=FALSE] >= U[combs[2,], , drop=FALSE]
   smat <- array(s, dim=dim(s_star))
