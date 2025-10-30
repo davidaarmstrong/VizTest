@@ -613,7 +613,7 @@ plot.viztest <- function(x,
   segs$vbl <- rownames(segs)
   inp$label <- factor(1:nrow(inp), labels=inp$vbl)
   inp <- left_join(inp, segs, by=join_by(vbl))
-  cols <- c("est","lwr","upr","bound_start","bound_end")
+  cols <- c("est","lwr","upr","lwr_add","upr_add","bound_start","bound_end")
   inp[,cols] <- apply(inp[,cols],2,trans)
   if(any(inp$vbl == "zero"))inp <- inp[-which(inp$vbl == "zero"), ]
   if(!make_plot){
