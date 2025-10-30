@@ -52,6 +52,7 @@ globalVariables(c("bound_end", "bound_start", "est", "label", "lwr", "stim_end",
 #' 6. L: The lower confidence bounds from the grid search. 
 #' 7. U: The upper confidence bounds from the grid search. 
 #' 8. est: A data frame with the variables `vbl` - the parameter name; `est` - the parameter estimate; `se` - the parameter standard error. 
+#' 9. call: model call
 #' @examples
 #' data(mtcars)
 #' mtcars$cyl <- as.factor(mtcars$cyl)
@@ -70,7 +71,7 @@ viztest <- function(obj,
                     include_intercept = FALSE,
                     include_zero = TRUE,
                     sig_diffs = NULL,
-                    tol = 1e-06,
+                    tol = 1e-08,
                     ...){
   UseMethod("viztest")
 }
@@ -129,7 +130,7 @@ viztest.default <- function(obj,
     D[cbind(combs[2,], 1:ncol(combs))] <- -1
     diffs <- bhat %*% D
     se_diffs <- sqrt(diag(t(D) %*% V %*% D))
-    p_diff <- pt(diffs/se_diffs, resdf, lower.tail=FALSE)
+    p_diff <- 2*pt(diffs/se_diffs, resdf, lower.tail=FALSE)
     p_diff <- p.adjust(p_diff, method=adj)
     s <- p_diff < test_level
   }else{
@@ -199,7 +200,8 @@ viztest.default <- function(obj,
               param_names = names(bhat),
               L = L,
               U = U, 
-              est = est_data)
+              est = est_data, 
+              call = match.call(viztest, call = sys.call()))
   class(res) <- "viztest"
   attr(res, "adjusted") <- adj
   attr(res, "test_level") <- test_level 
@@ -236,7 +238,7 @@ viztest.vtsim <- function(obj,
     D[cbind(combs[2,], 1:ncol(combs))] <- -1
     diffs <- est %*% D
     pvals <- apply(diffs, 2, \(x)mean(x > 0))
-    pvals <- ifelse(pvals > .5, 1-pvals, pvals)
+    pvals <- 2*ifelse(pvals > .5, 1-pvals, pvals)
     s <- pvals < test_level
   }else{
     s <- sig_diffs
@@ -304,7 +306,8 @@ viztest.vtsim <- function(obj,
               param_names = colnames(est),
               L = L,
               U = U, 
-              est = est_data)
+              est = est_data, 
+              call = match.call(viztest, call = sys.call()))
   class(res) <- "viztest"
   attr(res, "adjusted") <- "none"
   attr(res, "test_level") <- test_level 

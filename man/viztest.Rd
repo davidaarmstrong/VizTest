@@ -15,7 +15,7 @@ viztest(
   include_intercept = FALSE,
   include_zero = TRUE,
   sig_diffs = NULL,
-  tol = 1e-06,
+  tol = 1e-08,
   ...
 )
 }
@@ -56,6 +56,7 @@ normal theory tests; \code{pdiff} - the proportion of pairwise tests that are st
 \item L: The lower confidence bounds from the grid search.
 \item U: The upper confidence bounds from the grid search.
 \item est: A data frame with the variables \code{vbl} - the parameter name; \code{est} - the parameter estimate; \code{se} - the parameter standard error.
+\item call: model call
 }
 }
 \description{
