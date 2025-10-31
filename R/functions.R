@@ -542,6 +542,7 @@ make_segs <- function(.data, vdt = .02, ...){
 #' @param ref_line_args A list of arguments to be passed to `geom_segment()` to plot the reference lines.
 #' @param scale_linewidth_args A list of arguments to be passed to `scale_linewidth_manual()` to change the thickness of the confidence intervals.
 #' @param scale_color_args A list of arguments to be passed to `scale_color_manual()` to change the default color of the different confidence intervals when `add_test_level=TRUE`.
+#' @param overall_theme A theme function that will be passed to the `ggplot` call before `theme()`. Default is `theme_bw`.
 #' @param theme_arg A list of arguments to be passed to `theme()` to modify the theme of the plot.
 #' @param remove_caption Logical indicating whether caption should be removed.  By default, it is printed to alert the user. 
 #' @param ... Other arguments passed down.  Currently not implemented.
@@ -584,6 +585,7 @@ plot.viztest <- function(x,
                          ref_line_args = list(color="gray75", linetype=3),
                          scale_linewidth_args = list(values=c(3.5, .5)),
                          scale_color_args = list(values = c("gray75", "black")),
+                         overall_theme = theme_bw,
                          theme_arg = list(legend.position="top"),
                          remove_caption=FALSE){
   inp <- x$est
@@ -632,6 +634,7 @@ plot.viztest <- function(x,
       do.call(geom_linerange, opt_ci_args) +
       do.call(scale_linewidth_manual,scale_linewidth_args) +
       do.call(scale_color_manual,scale_color_args)+
+      overall_theme() +
       do.call(theme,theme_arg)
     if(add_test_level & all(c("lwr_add", "upr_add") %in% colnames(inp))){
       g <- g + do.call(geom_linerange, test_ci_args)
