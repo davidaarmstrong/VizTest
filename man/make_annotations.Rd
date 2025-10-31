@@ -4,10 +4,18 @@
 \alias{make_annotations}
 \title{Make Annotations for Significance Brackets}
 \usage{
-make_annotations(obj, tol = 0, nudge = NULL, ...)
+make_annotations(
+  obj,
+  type = c("significant", "insignificant", "auto"),
+  tol = 0,
+  nudge = NULL,
+  ...
+)
 }
 \arguments{
 \item{obj}{An object of class \code{viztest} produced by the \code{viztest()} function.}
+
+\item{type}{Indicates whether annotations are produced for overlapping intervals that are significantly different from each other or not.}
 
 \item{tol}{Tolerance for determining whether intervals are close enough to be considered ambiguous.  This also plots significance flags for intervals that
 do not overlap, but the distance between them is smaller than the tolerance.  The default is zero, but increasing the value will potentially produce more significance flags.}
