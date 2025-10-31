@@ -540,6 +540,9 @@ make_segs <- function(.data, vdt = .02, ...){
 #' @param opt_ci_args A list of arguments to be passed to `geom_linerange()` to plot the optimal visual testing intervals. 
 #' @param test_ci_args A list of arguments to be passed to `geom_linerange()` to plot the (1-test level) confidence intervals.
 #' @param ref_line_args A list of arguments to be passed to `geom_segment()` to plot the reference lines.
+#' @param scale_linewidth_args A list of arguments to be passed to `scale_linewidth_manual()` to change the thickness of the confidence intervals.
+#' @param scale_color_args A list of arguments to be passed to `scale_color_manual()` to change the default color of the different confidence intervals when `add_test_level=TRUE`.
+#' @param theme_arg A list of arguments to be passed to `theme()` to modify the theme of the plot.
 #' @param remove_caption Logical indicating whether caption should be removed.  By default, it is printed to alert the user. 
 #' @param ... Other arguments passed down.  Currently not implemented.
 #' @details The `ref_lines` argument identifies what reference lines will be plotted in the figure.  For any particular stimulus, the reference lines run along the upper bound of the stimulus from the stimulus location to the most distant stimulus with overlapping confidence intervals.  
@@ -578,7 +581,10 @@ plot.viztest <- function(x,
                          est_point_args = list(color="black", size=2), 
                          opt_ci_args = list(),
                          test_ci_args = list(),
-                         ref_line_args = list(color="gray75", linetype=3), 
+                         ref_line_args = list(color="gray75", linetype=3),
+                         scale_linewidth_args = list(values=c(3.5, .5)),
+                         scale_color_args = list(values = c("gray75", "black")),
+                         theme_arg = list(legend.position="top"),
                          remove_caption=FALSE){
   inp <- x$est
   tmp <- x$tab[which(x$tab$psame == max(x$tab$psame)), ]
@@ -623,7 +629,10 @@ plot.viztest <- function(x,
     est_point_args$mapping <- aes(x=est, y=label)
     ref_line_args$mapping <- aes(x=bound_start, xend=bound_end, y=stim_start, yend=stim_end)
     g <- ggplot(inp) + 
-      do.call(geom_linerange, opt_ci_args) 
+      do.call(geom_linerange, opt_ci_args) +
+      do.call(scale_linewidth_manual,scale_linewidth_args) +
+      do.call(scale_color_manual,scale_color_args)+
+      do.call(theme,theme_arg)
     if(add_test_level & all(c("lwr_add", "upr_add") %in% colnames(inp))){
       g <- g + do.call(geom_linerange, test_ci_args)
     }
