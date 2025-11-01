@@ -10,7 +10,8 @@ Description: Identifies the optimal confidence level to represent the results of
 Depends: R (>= 4.1.0), 
     dplyr, 
     emmeans,
-    ggplot2, 
+    ggplot2,
+    ggtext, 
     HDInterval, 
     multcomp, 
     tidyr

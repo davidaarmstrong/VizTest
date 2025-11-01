@@ -564,6 +564,7 @@ make_segs <- function(.data, vdt = .02, ...){
 #' @method plot viztest
 #' @importFrom dplyr left_join arrange `%>%` join_by
 #' @importFrom ggplot2 ggplot geom_pointrange geom_segment aes labs geom_point geom_linerange
+#' @importFrom ggtext element_textbox_simple
 #' @examples
 #' data(mtcars)
 #' mod2 <- lm(mpg ~ as.factor(cyl) + vs + am + as.factor(gear), data = mtcars)
@@ -586,7 +587,9 @@ plot.viztest <- function(x,
                          scale_linewidth_args = list(values=c(3.5, .5)),
                          scale_color_args = list(values = c("gray75", "black")),
                          overall_theme = theme_bw,
-                         theme_arg = list(legend.position="top"),
+                         theme_arg = list(legend.position="top", 
+                                          plot.caption = element_textbox_simple(width = unit(1, "npc"),  # Wraps to plot width
+                                                                                halign = 0)),
                          remove_caption=FALSE){
   inp <- x$est
   tmp <- x$tab[which(x$tab$psame == max(x$tab$psame)), ]
@@ -653,7 +656,7 @@ plot.viztest <- function(x,
       ref_line_args$data <- inp[incl, ]
       g <- g + do.call(geom_segment, ref_line_args)
     }
-    if(!remove_caption)lab_args$caption <- "Confidence intervals have been adjusted to permit visual testing as per Armstrong and Poirier (2025) <doi:10.1017/pan.2024.24>"
+    if(!remove_caption)lab_args$caption <- "Confidence intervals have been adjusted to permit visual testing as per Armstrong and Poirier (2025) [doi:10.1017/pan.2024.24]"
     g <- g + do.call(labs, lab_args)
     res <- g
   }

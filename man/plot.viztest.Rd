@@ -19,7 +19,9 @@
   ref_line_args = list(color = "gray75", linetype = 3),
   scale_linewidth_args = list(values = c(3.5, 0.5)),
   scale_color_args = list(values = c("gray75", "black")),
-  theme_arg = list(legend.position = "top"),
+  overall_theme = theme_bw,
+  theme_arg = list(legend.position = "top", plot.caption = element_textbox_simple(width =
+    unit(1, "npc"), halign = 0)),
   remove_caption = FALSE
 )
 }
@@ -51,6 +53,8 @@
 \item{scale_linewidth_args}{A list of arguments to be passed to \code{scale_linewidth_manual()} to change the thickness of the confidence intervals.}
 
 \item{scale_color_args}{A list of arguments to be passed to \code{scale_color_manual()} to change the default color of the different confidence intervals when \code{add_test_level=TRUE}.}
+
+\item{overall_theme}{A theme function that will be passed to the \code{ggplot} call before \code{theme()}. Default is \code{theme_bw}.}
 
 \item{theme_arg}{A list of arguments to be passed to \code{theme()} to modify the theme of the plot.}
 
