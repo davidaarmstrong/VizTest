@@ -802,30 +802,71 @@ is_pd <- function(x, tol=1e-08){
 #' Gets the letter matrix for a compact letter display.  This can be passed to the `letter_plot()` function from the `psre` package to produce plots of 
 #' confidence intervals with a letter display.  
 #' 
-#' @param x An object that is compatible with the `glht()` function
-#' @param linfct The linear function contrasts to be used in the multiple comparisons.
-#' @param ... Arguments to be passed down to `glht()` or `summary.glht()`.  Arguments for the former include `coef.`, `vcov.`, and `df`.  
-#' Arguments for the latter include `test` and a host of others.  See the help file for `summary.glht` for examples. 
+#' @param x An object that can be one of the following classes: an object of class `glht` produced by `glht()` from the `multcomp` package, 
+#' an object of class `emmGrid` produced by the `emmeans` package, or a list with elements `est` - a vector of estimates and `var` - a variance-covariance matrix for the estimates.
+#' @param ... Additional arguments passed down either to `cld` if the object is an `emmGrid` class or `summary.glht` if the object is a `glht` class.  
+#' If `x` is a list of estimates and variances, it will be converted to an `emmGrid` object internally and the `emmGrid` method dispatched, 
+#' `...` will be passed to `cld` in that case. Additional arguments for the `summary.glht()` include `test` and a host of others.  See the help file for `summary.glht` for examples. 
+#' Additional arguments for `cld` include `adjust` for multiplicity corrections and others.  See `?emmeans:::cld.emmGrid` for options and details. 
 #' 
+#' @returns A logical index indicating which estimates are in which letter group. 
 #' @export
 #' 
 #' @importFrom multcomp glht cld
-get_letters <- function(x, linfct, ...){
-  args <- list(...)
-  if(any(names(args) %in% c("coef.", "vcov.", "df"))){
-    g_args <- args[intersect(names(args),c("coef.", "vcov.", "df"))]
-    args[intersect(names(args),c("coef.", "vcov.", "df"))] <- NULL
-  }else{
-    g_args <- list()
+get_letters <- function(x=NULL, ...){
+  UseMethod("get_letters")
+}
+
+#' @importFrom emmeans emmobj
+#' @method get_letters default
+#' @export
+get_letters.default <- function(x, ...){
+  if(!all(c("est", "var") %in% names(x))){
+    stop("x should be a list with elements 'est' - a vector of estimates and 'var' - a variance-covariance matrix for the estimates.\n")
   }
-  g_args$model <- x
-  g_args$linfct <- linfct
-  g <- do.call(glht, g_args)
-  args$object <- g
+  est <- x$est
+  nms <- names(est)
+  if(is.null(nms)){
+    nms <- paste0("b_", seq_along(est))
+    names(est) <- nms
+  }
+  obj <- emmobj(est, x$var, levels=nms)
+  get_letters(obj, ...)
+}
+
+#' @method get_letters glht 
+#' @export
+get_letters.glht <- function(x, ...){
+  args <- list(...)
+  args$object <- x
   s <- do.call(summary, args)
   cl <- cld(s)
   cl$mcletters$LetterMatrix
 }
+
+#' @method get_letters emmGrid
+#' @export
+get_letters.emmGrid <- function(x, ...){
+  args <- list(...)
+  args$Letters <- letters
+  args$object <- x
+  cl <- do.call(cld, args)
+  grps <- cl$.group
+  unletters <- unique(c(unlist(strsplit(grps, ""))))
+  if(any(unletters == " ")){
+    unletters <- unletters[-which(unletters == " ")]
+  }
+  unletters <- sort(unletters)
+  out <- matrix(NA, nrow = nrow(cl), ncol=length(unletters))
+  colnames(out) <- unletters
+  rownames(out) <- cl[[1]]
+  for(l in seq_along(unletters)){
+    out[,l] <- grepl(unletters[l], grps)
+  }
+  out
+}
+
+
 
 #' Make Annotations for Significance Brackets
 #' 
@@ -833,7 +874,8 @@ get_letters <- function(x, linfct, ...){
 #' pairs of estimates whose confidence intervals overlap, but the estimates are nonetheless significantly different from each other.  
 #' 
 #' @param obj An object of class `viztest` produced by the `viztest()` function.
-#' @param type Indicates whether annotations are produced for overlapping intervals that are significantly different from each other or not. 
+#' @param type Indicates whether annotations are produced for overlapping intervals that are significantly different from each other or not. The `"auto"` option will
+#' find the type that produces the fewest annotations. 
 #' @param tol Tolerance for determining whether intervals are close enough to be considered ambiguous.  This also plots significance flags for intervals that 
 #' do not overlap, but the distance between them is smaller than the tolerance.  The default is zero, but increasing the value will potentially produce more significance flags. 
 #' @param nudge A vector of the same length as the number of brackets.  This will nudge the y-position of the brakcet by the indicated amount.  This will be difficult to 
@@ -841,7 +883,7 @@ get_letters <- function(x, linfct, ...){
 #' @param ... Other arguments, currently ignored. 
 #' 
 #' @export
-make_annotations <- function(obj, type = c("significant", "insignificant", "auto"),  tol = 0, nudge=NULL, ...){
+make_annotations <- function(obj, type = c("auto", "significant", "insignificant"),  tol = 0, nudge=NULL, ...){
   typ <- match.arg(type)
   if(typ == "auto"){
     ns <- make_annotations(obj, type="insignificant", tol=tol, nudge=nudge, ...)
@@ -893,3 +935,86 @@ make_annotations <- function(obj, type = c("significant", "insignificant", "auto
   )
 }
 
+#' Convert factorplot output to data frame
+#' 
+#' Converts the output from factorplot to a data frame that is convenient for custom plotting.  
+#' The plot method for factorplot objects from the factorplot package will produce a plot that is 
+#' lightly customisable.  However,  for more control over the appearance of the plot, and to plot estimates
+#' on the diagnoal of the display, returning the data and making a plot is easier.  
+#' 
+#' @param obj An object of class `factorplot` produced by the `factorplot()` function from the `factorplot` package.
+#' @param type Indicates whether you want the resulting plot to have differences on the upper triangle and p-values on the lower triangle (if `"both_tri"`) or 
+#' both p-values and differences to be plotted in the upper triangle.  
+#' @param ... Other arguments, currently ignored.
+#' @returns A data frame with columns
+#'  - `row`: The name of the parameter in the row
+#'  - `col`: The name of the parameter in the column
+#'  - `estimate`: The estimate for the parameter (on the diagonal)
+#'  - `difference`: Pairwise differences between parameters. 
+#'  - `p_value`: The p-value of the pairwise difference. 
+#'  
+#' @export
+#' @examples
+#' library(factorplot)
+#' library(ggplot2)
+#' data(chickwts)
+#' mod <- lm(weight ~ feed, data=chickwts)
+#' fp <- factorplot(mod, factor.variable = "feed", order="size")
+#' chick_df <- fp_to_df(fp, type="upper_tri")
+#' ggplot(chick_df, aes(x=row, y=column)) + 
+#'   geom_tile(aes(fill=difference), color="black") + 
+#'   geom_text(aes(label = ifelse(p_value < .05, "*", "")), color="white", size=10) + 
+#'   scale_fill_viridis_c(option = "D", na.value = "transparent") + 
+#'   theme_classic() + 
+#'   geom_text(data=chick_df, 
+#'             aes(x=row, y=column, label=round(estimate, 2))) + 
+#'   labs(fill="Difference", x="", y="")
+fp_to_df <- function(obj, type=c("both_tri", "upper_tri"), ...){
+  typ <- match.arg(type)
+  if(!"est" %in% names(obj)){
+    stop("The fp_to_matrix() function does not work for factorplot calculated on glht or summary.glht objects.\n")
+  }
+  param_names <- c(rownames(obj$b.diff), colnames(obj$b.diff)[ncol(obj$b.diff)])
+  mat <- matrix(NA, nrow=length(param_names), ncol = length(param_names))
+  colnames(mat) <- rownames(mat) <- param_names
+  if(typ == "both_tri"){
+    mat <- matrix(NA, nrow=length(param_names), ncol = length(param_names))
+    colnames(mat) <- rownames(mat) <- param_names
+    mat[lower.tri(mat)] <- t(obj$b.diff)[lower.tri(obj$b.diff, diag = TRUE)]
+    mat[upper.tri(mat)] <- obj$pval[upper.tri(obj$pval, diag=TRUE)]
+    tmpl <- array(dim = dim(mat))
+    diag(tmpl) <- "estimate"
+    tmpl[lower.tri(tmpl)] <- "difference"
+    tmpl[upper.tri(tmpl)] <- "pval"
+    rownames(tmpl) <- colnames(tmpl) <- rownames(mat)
+    diag(mat) <- obj$est
+    mat <- mat[, ncol(mat):1]
+    tmpl <- tmpl[,ncol(tmpl):1]
+    out <- as.data.frame(as.table(mat))
+    tmpl <- as.data.frame(as.table(tmpl))
+    names(out) <- c("row", "column", "value")
+    names(tmpl) <- c("row", "column", "type")
+    out <- merge(out, tmpl)
+    out$p_value <- ifelse(out$type == "pval", out$value, NA)
+    out$difference <- ifelse(out$type == "difference", out$value, NA)
+    out$estimate <- ifelse(out$type == "estimate", out$value, NA)
+  }else{
+    est_mat <- diff_mat <- pv_mat <- mat
+    pv_mat[lower.tri(diff_mat)] <- t(obj$pval)[lower.tri(obj$pval, diag=TRUE)]
+    diff_mat[lower.tri(diff_mat)] <- t(obj$b.diff)[lower.tri(obj$b.diff, diag=TRUE)]
+    diag(est_mat) <- obj$est
+    pv_mat <- pv_mat[, ncol(pv_mat):1]
+    diff_mat <- diff_mat[, ncol(pv_mat):1]
+    est_mat <- est_mat[, ncol(pv_mat):1]
+    est_dat <- as.data.frame(as.table(est_mat))
+    diff_dat <- as.data.frame(as.table(diff_mat))
+    pv_dat <- as.data.frame(as.table(pv_mat))
+    names(est_dat) <- c("row", "column", "estimate")
+    names(diff_dat) <- c("row", "column", "difference")
+    names(pv_dat) <- c("row", "column", "p_value")
+    out <- merge(diff_dat, pv_dat)
+    out <- merge(out, est_dat)
+    out <- out[-which(rowSums(is.na(out)) == 3), ]
+  }
+  out
+}

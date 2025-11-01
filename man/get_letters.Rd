@@ -4,15 +4,19 @@
 \alias{get_letters}
 \title{Get Letters for Multiple Comparisons}
 \usage{
-get_letters(x, linfct, ...)
+get_letters(x = NULL, ...)
 }
 \arguments{
-\item{x}{An object that is compatible with the \code{glht()} function}
+\item{x}{An object that can be one of the following classes: an object of class \code{glht} produced by \code{glht()} from the \code{multcomp} package,
+an object of class \code{emmGrid} produced by the \code{emmeans} package, or a list with elements \code{est} - a vector of estimates and \code{var} - a variance-covariance matrix for the estimates.}
 
-\item{linfct}{The linear function contrasts to be used in the multiple comparisons.}
-
-\item{...}{Arguments to be passed down to \code{glht()} or \code{summary.glht()}.  Arguments for the former include \code{coef.}, \code{vcov.}, and \code{df}.
-Arguments for the latter include \code{test} and a host of others.  See the help file for \code{summary.glht} for examples.}
+\item{...}{Additional arguments passed down either to \code{cld} if the object is an \code{emmGrid} class or \code{summary.glht} if the object is a \code{glht} class.
+If \code{x} is a list of estimates and variances, it will be converted to an \code{emmGrid} object internally and the \code{emmGrid} method dispatched,
+\code{...} will be passed to \code{cld} in that case. Additional arguments for the \code{summary.glht()} include \code{test} and a host of others.  See the help file for \code{summary.glht} for examples.
+Additional arguments for \code{cld} include \code{adjust} for multiplicity corrections and others.  See \code{?emmeans:::cld.emmGrid} for options and details.}
+}
+\value{
+A logical index indicating which estimates are in which letter group.
 }
 \description{
 Gets the letter matrix for a compact letter display.  This can be passed to the \code{letter_plot()} function from the \code{psre} package to produce plots of

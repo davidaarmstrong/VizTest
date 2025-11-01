@@ -17,6 +17,9 @@
   opt_ci_args = list(),
   test_ci_args = list(),
   ref_line_args = list(color = "gray75", linetype = 3),
+  scale_linewidth_args = list(values = c(3.5, 0.5)),
+  scale_color_args = list(values = c("gray75", "black")),
+  theme_arg = list(legend.position = "top"),
   remove_caption = FALSE
 )
 }
@@ -44,6 +47,12 @@
 \item{test_ci_args}{A list of arguments to be passed to \code{geom_linerange()} to plot the (1-test level) confidence intervals.}
 
 \item{ref_line_args}{A list of arguments to be passed to \code{geom_segment()} to plot the reference lines.}
+
+\item{scale_linewidth_args}{A list of arguments to be passed to \code{scale_linewidth_manual()} to change the thickness of the confidence intervals.}
+
+\item{scale_color_args}{A list of arguments to be passed to \code{scale_color_manual()} to change the default color of the different confidence intervals when \code{add_test_level=TRUE}.}
+
+\item{theme_arg}{A list of arguments to be passed to \code{theme()} to modify the theme of the plot.}
 
 \item{remove_caption}{Logical indicating whether caption should be removed.  By default, it is printed to alert the user.}
 }

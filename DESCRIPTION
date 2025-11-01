@@ -9,6 +9,7 @@ Authors@R:
 Description: Identifies the optimal confidence level to represent the results of a set of pairwise tests as suggested by Armstrong and Poirier (2025) <doi:10.1017/pan.2024.24>.  
 Depends: R (>= 4.1.0), 
     dplyr, 
+    emmeans,
     ggplot2, 
     HDInterval, 
     multcomp, 
@@ -16,6 +17,7 @@ Depends: R (>= 4.1.0),
 Suggests: 
     carData,
     collapse,
+    factorplot,
     knitr,
     lme4,
     marginaleffects,

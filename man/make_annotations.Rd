@@ -6,7 +6,7 @@
 \usage{
 make_annotations(
   obj,
-  type = c("significant", "insignificant", "auto"),
+  type = c("auto", "significant", "insignificant"),
   tol = 0,
   nudge = NULL,
   ...
@@ -15,7 +15,8 @@ make_annotations(
 \arguments{
 \item{obj}{An object of class \code{viztest} produced by the \code{viztest()} function.}
 
-\item{type}{Indicates whether annotations are produced for overlapping intervals that are significantly different from each other or not.}
+\item{type}{Indicates whether annotations are produced for overlapping intervals that are significantly different from each other or not. The \code{"auto"} option will
+find the type that produces the fewest annotations.}
 
 \item{tol}{Tolerance for determining whether intervals are close enough to be considered ambiguous.  This also plots significance flags for intervals that
 do not overlap, but the distance between them is smaller than the tolerance.  The default is zero, but increasing the value will potentially produce more significance flags.}
