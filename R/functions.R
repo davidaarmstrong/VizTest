@@ -1,4 +1,4 @@
-globalVariables(c("bound_end", "bound_start", "est", "label", "lwr", "stim_end", "stim_start", "upr", "vbl", "i", "j", "vij", "zb"))
+globalVariables(c("bound_end", "bound_start", "est", "label", "lwr", "stim_end", "stim_start", "upr", "vbl", "i", "j", "vij", "zb", "smaller", "larger", "ll", "us", "olap", "ambig", "lwr_add", "upr_add"))
 
 #' Calculate Correspondence Between Pairwise Test and CI Overlaps
 #' 
@@ -563,7 +563,7 @@ make_segs <- function(.data, vdt = .02, ...){
 #' * `ambiguous` - Logical vector indicating whether the comparison is considered "ambiguous". 
 #' @method plot viztest
 #' @importFrom dplyr left_join arrange `%>%` join_by
-#' @importFrom ggplot2 ggplot geom_pointrange geom_segment aes labs geom_point geom_linerange
+#' @importFrom ggplot2 ggplot geom_pointrange geom_segment aes labs geom_point geom_linerange unit theme_bw scale_color_manual scale_linewidth_manual theme
 #' @importFrom ggtext element_textbox_simple
 #' @examples
 #' data(mtcars)
@@ -888,6 +888,7 @@ get_letters.emmGrid <- function(x, ...){
 #' specify ahead of time, but can be specified to clean up a plot after an initial run. 
 #' @param ... Other arguments, currently ignored. 
 #' 
+#' @importFrom stats confint
 #' @export
 make_annotations <- function(obj, type = c("auto", "significant", "insignificant"),  tol = 0, nudge=NULL, ...){
   typ <- match.arg(type)
@@ -899,10 +900,6 @@ make_annotations <- function(obj, type = c("auto", "significant", "insignificant
     }else{
       return(s)
     }    
-  }
-  if(!"lwr_add" %in% names(obj$est)){
-    obj$call[[1L]] <- as.name("viztest")
-    obj <- update(obj, add_test_level=TRUE)
   }
   lwr <- obj$est$lwr_add
   names(lwr) <- obj$est$vbl
@@ -941,86 +938,3 @@ make_annotations <- function(obj, type = c("auto", "significant", "insignificant
   )
 }
 
-#' Convert factorplot output to data frame
-#' 
-#' Converts the output from factorplot to a data frame that is convenient for custom plotting.  
-#' The plot method for factorplot objects from the factorplot package will produce a plot that is 
-#' lightly customisable.  However,  for more control over the appearance of the plot, and to plot estimates
-#' on the diagnoal of the display, returning the data and making a plot is easier.  
-#' 
-#' @param obj An object of class `factorplot` produced by the `factorplot()` function from the `factorplot` package.
-#' @param type Indicates whether you want the resulting plot to have differences on the upper triangle and p-values on the lower triangle (if `"both_tri"`) or 
-#' both p-values and differences to be plotted in the upper triangle.  
-#' @param ... Other arguments, currently ignored.
-#' @returns A data frame with columns
-#'  - `row`: The name of the parameter in the row
-#'  - `col`: The name of the parameter in the column
-#'  - `estimate`: The estimate for the parameter (on the diagonal)
-#'  - `difference`: Pairwise differences between parameters. 
-#'  - `p_value`: The p-value of the pairwise difference. 
-#'  
-#' @export
-#' @examples
-#' library(factorplot)
-#' library(ggplot2)
-#' data(chickwts)
-#' mod <- lm(weight ~ feed, data=chickwts)
-#' fp <- factorplot(mod, factor.variable = "feed", order="size")
-#' chick_df <- fp_to_df(fp, type="upper_tri")
-#' ggplot(chick_df, aes(x=row, y=column)) + 
-#'   geom_tile(aes(fill=difference), color="black") + 
-#'   geom_text(aes(label = ifelse(p_value < .05, "*", "")), color="white", size=10) + 
-#'   scale_fill_viridis_c(option = "D", na.value = "transparent") + 
-#'   theme_classic() + 
-#'   geom_text(data=chick_df, 
-#'             aes(x=row, y=column, label=round(estimate, 2))) + 
-#'   labs(fill="Difference", x="", y="")
-fp_to_df <- function(obj, type=c("both_tri", "upper_tri"), ...){
-  typ <- match.arg(type)
-  if(!"est" %in% names(obj)){
-    stop("The fp_to_matrix() function does not work for factorplot calculated on glht or summary.glht objects.\n")
-  }
-  param_names <- c(rownames(obj$b.diff), colnames(obj$b.diff)[ncol(obj$b.diff)])
-  mat <- matrix(NA, nrow=length(param_names), ncol = length(param_names))
-  colnames(mat) <- rownames(mat) <- param_names
-  if(typ == "both_tri"){
-    mat <- matrix(NA, nrow=length(param_names), ncol = length(param_names))
-    colnames(mat) <- rownames(mat) <- param_names
-    mat[lower.tri(mat)] <- t(obj$b.diff)[lower.tri(obj$b.diff, diag = TRUE)]
-    mat[upper.tri(mat)] <- obj$pval[upper.tri(obj$pval, diag=TRUE)]
-    tmpl <- array(dim = dim(mat))
-    diag(tmpl) <- "estimate"
-    tmpl[lower.tri(tmpl)] <- "difference"
-    tmpl[upper.tri(tmpl)] <- "pval"
-    rownames(tmpl) <- colnames(tmpl) <- rownames(mat)
-    diag(mat) <- obj$est
-    mat <- mat[, ncol(mat):1]
-    tmpl <- tmpl[,ncol(tmpl):1]
-    out <- as.data.frame(as.table(mat))
-    tmpl <- as.data.frame(as.table(tmpl))
-    names(out) <- c("row", "column", "value")
-    names(tmpl) <- c("row", "column", "type")
-    out <- merge(out, tmpl)
-    out$p_value <- ifelse(out$type == "pval", out$value, NA)
-    out$difference <- ifelse(out$type == "difference", out$value, NA)
-    out$estimate <- ifelse(out$type == "estimate", out$value, NA)
-  }else{
-    est_mat <- diff_mat <- pv_mat <- mat
-    pv_mat[lower.tri(diff_mat)] <- t(obj$pval)[lower.tri(obj$pval, diag=TRUE)]
-    diff_mat[lower.tri(diff_mat)] <- t(obj$b.diff)[lower.tri(obj$b.diff, diag=TRUE)]
-    diag(est_mat) <- obj$est
-    pv_mat <- pv_mat[, ncol(pv_mat):1]
-    diff_mat <- diff_mat[, ncol(pv_mat):1]
-    est_mat <- est_mat[, ncol(pv_mat):1]
-    est_dat <- as.data.frame(as.table(est_mat))
-    diff_dat <- as.data.frame(as.table(diff_mat))
-    pv_dat <- as.data.frame(as.table(pv_mat))
-    names(est_dat) <- c("row", "column", "estimate")
-    names(diff_dat) <- c("row", "column", "difference")
-    names(pv_dat) <- c("row", "column", "p_value")
-    out <- merge(diff_dat, pv_dat)
-    out <- merge(out, est_dat)
-    out <- out[-which(rowSums(is.na(out)) == 3), ]
-  }
-  out
-}
