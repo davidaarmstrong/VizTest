@@ -178,6 +178,9 @@ viztest.default <- function(obj,
       zero_ind <- which(names(bhat) == "zero")
       tmp_bhat <- bhat[-zero_ind]
       tmp_V <- V[-zero_ind, -zero_ind]
+    }else {
+      tmp_bhat <- bhat
+      tmp_V <- V
     }
     K <- diag(length(tmp_bhat))
     g <- glht(model = NULL, linfct = K, coef.=tmp_bhat, vcov.=tmp_V)

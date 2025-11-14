@@ -1,0 +1,243 @@
+---
+title: "Making Compact Letter Displays"
+author: "Dave Armstrong and William Poirier"
+date: "`r Sys.Date()`"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Making Compact Letter Displays}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>", 
+  message = FALSE, 
+  warning = FALSE
+)
+```
+
+Compact letter displays use letters to identify groups of observations that are not different from each other.  This permits pairwise testing for any arbitrary pair of results, potentially adjusted for multiple testing.  There are procedures in the \CRANpkg{multcomp} and \CRANpkg{emmeans} packages that produce compact letter displays, but their visual display is a bit limited.  The `psre` package provides a function called `letter_plot` that will take a set of estimates and their associated compact letter matrix and produce a plot.  This is an alternative display to the one produced by the `viztest()` function and its plot method, but it is an alternative that may be useful to some users.  These are particularly useful when the number of estimates to plot is on the low side (< 10 or so) and the patterns of significance are not too complicated. 
+
+## Chick Weights
+
+We first demonstrate the procedure using the `chickwts` built-in dataset.  The first step is to generate the estimates, we predict chicken weight (`weight`) with feed type (`feed`).  To make the display easiest to read, we re-rorder the feed type factor by the average weight, which will make the intervals decreasing in their average. 
+
+```{r}
+data(chickwts)
+chickwts$feed <- reorder(chickwts$feed, 
+                         chickwts$weight, 
+                         FUN=mean)
+chick_mod <- lm(weight~ feed, data=chickwts)
+```
+
+Next, we use the `glht()` function from the \CRANpkg{multcomp} package to make the paired comparisons.  
+
+```{r}
+library(VizTest)
+library(multcomp)
+chick_gl <- glht(chick_mod, linfct=mcp(feed = "Tukey"))
+```
+
+The function `get_letters()` is in the \CRANpkg{VizTest} pacakge and will generate the compact letter display matrix from the pairwise comparisons. 
+
+```{r}
+lmat_gl <- get_letters(chick_gl, test=adjusted(type="none"))
+lmat_gl
+```
+
+We could do the same with the `emmeans()` function from the \CRANpkg{emmeans} package. 
+
+```{r}
+library(emmeans)
+chick_em <- emmeans(chick_mod, "feed")
+lmat_em <- get_letters(chick_em, adjust="none")
+lmat_em
+```
+
+Finally, we could do the same by passing `get_letters()` a list with elements `est` (a vector of estimates) and `var` (a corresponding variance-covariance matrix). 
+
+```{r}
+library(marginaleffects)
+chick_preds <- predictions(chick_mod, variables="feed", by="feed")
+chick_b <- coef(chick_preds)
+names(chick_b) <- chick_preds$feed
+lmat_df <- get_letters(list(est=chick_b, var=vcov(chick_preds)), adjust="none")
+lmat_df
+```
+Now that we have the letter matrices, we can make the plots.  The `letter_plot()` function takes two arguments: a data frame with columns `x` (the grouping variable) and `predicted` (the predicted values), and the letter matrix.  We first prepare the data frame of predictions.  We need to rename the relevant variables first
+
+```{r}
+library(dplyr)
+chick_preds_dat <- chick_preds %>% 
+  as.data.frame() %>% 
+  rename(x = feed, predicted=estimate)
+```
+
+Finally, we can make the figure
+
+
+```{r chick-letter, fig.width=6, fig.height=4, fig.align="center", fig.cap="Predicted chick weights by feed type with 95% confidence intervals and a compact letter display"}
+library(psre)
+letter_plot(chick_preds_dat, lmat_gl)
+```
+
+The figure shows that `horsebean` is different from all other feed types because it is the only feed type in letter `a` and is not in any other letter group.  The `soybean` and `linseed` estimates are not different from each other because they are both in group `b`.  The `soymean` and `meatmeal` estimates are also not different from each other.  However, the `linseed` and `meatmeal` estimates are different from each other because they are not both members in the same letter group.  The estimates for `sunflower` and `casein` are not different from each other, but are significantly larger than all other types. 
+
+## Ornstein Data
+
+The Ornstein data in the \CRANpkg{carData} package contains measures of the assets of ten different sectors in four different nations along with the number of interlocking director and executive positions shared with other firms.  We estimate a generalized linear model model of interlocks as a function of assets, sector and nation.  We then generate predictions for nation and make the letter display. 
+
+```{r}
+## Load Data
+data(Ornstein, package="carData")
+
+## Estimate Model
+imod <- glm(interlocks ~ log2(assets) + sector + nation, data=Ornstein, 
+    family=poisson)
+
+## Generate Predictions
+ipreds <- predictions(imod, variables = "sector", by = "sector")
+```
+
+The next steps are not strictly necessary - they will allow us to sort the estimates so they are ordered from smallest to largest.  We do so by joining the predictions with the observed data.  Then, order the sector factor by predicted value.  Then, we update the model and generate the predictions again. 
+
+```{r}
+## merge predictions and data
+Ornstein <- Ornstein %>% 
+  left_join(ipreds %>% 
+              as.data.frame() %>% 
+              dplyr::select(sector, estimate)) %>% 
+  ## re-order factor 
+  mutate(sector = reorder(sector, estimate, mean))
+
+## update model
+imod <- update(imod, data=Ornstein)
+
+## make predictions again
+ipreds <- predictions(imod, variables = "sector", by = "sector")
+```
+
+Next, we save the estimates and name them and use the `get_letters()` function on the result. 
+
+```{r}
+est <- ipreds$estimate
+names(est) <- ipreds$sector
+i_lets <- get_letters(list(est=est, var = vcov(ipreds)), adjust="none")
+```
+
+Finally, we rename the columns of the predictions so that `sector` is `x` and `estimate` is `predicted` as expected by the `letter_plot()` function.  Then we make the plot. 
+
+```{r  orn-lets, fig.width=6, fig.height=6, fig.align="center", fig.cap="Predicted chick weights by feed type with 95% confidence intervals and a compact letter display"}
+ipreds <- ipreds %>% 
+  as.data.frame() %>% 
+  rename(x = sector, predicted=estimate)
+letter_plot(ipreds, i_lets)
+```
+
+## Multi-panel Display: UCBAdmissions
+
+Using the `UCBAdmissions` data, we can make a multi-panel display, in this case two panels - one for men and one for women. To do this, we need to make the letters independently.  We could do this from a single model or from multiple models.  First, let's turn the dataset into something amenable for modeling and then run the model predicting admission rates by gender and department. 
+
+```{r}
+data(UCBAdmissions)
+
+ucb_dat <- as.data.frame(UCBAdmissions) %>% 
+  tidyr::pivot_wider(names_from = "Admit", values_from = "Freq")
+
+ucb_mod <- glm(cbind(Admitted, Rejected) ~ Gender * Dept, 
+               data=ucb_dat, family=binomial)
+```
+
+We can then make some predictions with the `predictions()` function from the \CRANPkg{marginaleffects} package. Below, we make one set of predictions and then subset them to make the plots. The benefit of doing it this way is that the letter groups are actually comparable across panels.  That is to say, because Department F for both men and women are in letter group A, they are not significantly different from each other. 
+
+```{r ucb-lets, fig.width=10, fig.height=6, fig.align="center", fig.cap="Probability of being admitted to UC Berkeley by Gender and Department", out.width="100%"}
+## make predictions for both variables
+ucb_pred <- predictions(ucb_mod, variables=c("Gender", "Dept"), by=c("Gender", "Dept"))
+
+## save coefficients and variance-covariance matrix
+ucb_v <- vcov(ucb_pred)
+ucb_b <- coef(ucb_pred)
+
+## make joint-name of the group and y-axis variables (in this case, Gender and Dept)
+## We also rename the identifying variable "x" and the estimate variable to "predicted" 
+## as is expected by letter_plot().
+ucb_pred <- ucb_pred %>% 
+  as.data.frame() %>% 
+  mutate(gd = sprintf("%s-%s", Gender, Dept)) %>% 
+  rename(x=gd, predicted=estimate)
+
+## set the names of the estimates as the "x" variable. 
+names(ucb_b) <- ucb_pred$x
+
+## Get the letters
+ucb_lets <- get_letters(list(est=ucb_b, var=ucb_v), adjust="none")
+
+## subset the letters by looking for "Male" in the rownames
+m_lets <- ucb_lets[grepl("Male", rownames(ucb_lets)), ]
+
+## subset the letters by looking for "Female" in the rownames
+f_lets <- ucb_lets[grepl("Female", rownames(ucb_lets)), ]
+
+## Subset the predictions by gender
+m_preds <- ucb_pred %>% filter(Gender == "Male")
+f_preds <- ucb_pred %>% filter(Gender == "Female")
+
+## Make the letter plots - when done, remove "Male" and "Female" from the y-axis labels. 
+lp_m <- letter_plot(m_preds, m_lets) +
+  scale_y_discrete(labels = ~gsub("Male-", "", .x)) + 
+  facet_wrap(~"Male")
+
+lp_f <- letter_plot(f_preds, f_lets) +
+  scale_y_discrete(labels = ~gsub("Female-", "", .x)) + 
+  facet_wrap(~"Female")
+
+## Put the plots together. 
+library(patchwork)
+(lp_m + lp_f) + plot_layout(ncol=2)
+
+
+```
+The alternative way would be to do each plot independently by estimating separate models: 
+
+```{r ucb-lets2, fig.width=10, fig.height=6, fig.align="center", fig.cap="Probability of being admitted to UC Berkeley by Gender and Department", out.width="100%"}
+## Estimate subset models. 
+ucb_mod_m <- glm(cbind(Admitted, Rejected) ~ Dept, 
+               data=subset(ucb_dat, Gender == "Male"), family=binomial)
+ucb_mod_f <- glm(cbind(Admitted, Rejected) ~ Dept, 
+               data=subset(ucb_dat, Gender == "Female"), family=binomial)
+
+## generate subset model predictions
+ucb_pred_m <- predictions(ucb_mod_m, variables="Dept", by="Dept")
+ucb_pred_f <- predictions(ucb_mod_f, variables="Dept", by="Dept")
+
+## save and name coefficients; save variance-covariance matrices
+ucbb_m <- coef(ucb_pred_m)
+ucbb_f <- coef(ucb_pred_f)
+names(ucbb_m) <- names(ucbb_f) <- ucb_pred_m$Dept
+ucbv_m <- vcov(ucb_pred_m)
+ucbv_f <- vcov(ucb_pred_f)
+
+## get letters for each set of predictions and variances
+ucb_lets_m <- get_letters(list(est=ucbb_m, var=ucbv_m), adjust="none")
+ucb_lets_f <- get_letters(list(est=ucbb_f, var=ucbv_f), adjust="none")
+
+## rename relevant variabels. 
+ucb_pred_m <- ucb_pred_m %>% 
+  as.data.frame() %>% 
+  rename("x" = "Dept", "predicted" = "estimate")
+
+ucb_pred_f <- ucb_pred_f %>% 
+  as.data.frame() %>% 
+  rename("x" = "Dept", "predicted" = "estimate")
+
+## make plots
+lp_m <- letter_plot(ucb_pred_m, ucb_lets_m) + facet_wrap(~"Male")
+lp_f <- letter_plot(ucb_pred_f, ucb_lets_f) + facet_wrap(~"Female")
+
+## print plots together 
+(lp_m + lp_f) + plot_layout(ncol=2)
+```
+
+In this figure, the comparisons within panel are valid, but these letter groups cannot work across panels.  

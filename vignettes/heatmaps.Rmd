@@ -1,0 +1,194 @@
+---
+title: "Heatmaps for Pairwise Significance Testing"
+author: "Dave Armstrong and William Poirier"
+date: "`r Sys.Date()`"
+output: rmarkdown::html_vignette
+bibliography: vrefs.bib
+vignette: >
+  %\VignetteIndexEntry{Heatmaps for Pairwise Significance Testing}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>", 
+  message = FALSE, 
+  warning = FALSE
+)
+library(dplyr)
+```
+
+Heatmaps are a useful way to visualize the results of pairwise significance testing.  The work here starts with the \CRANpkg{factorplot} package which was designed for this purpose [@factorplot] and is similar in spirit (though with a different purpose than) @Villacorta_Saez_2015_SRCS.  The `pwpm()` function in the \CRANpkg{emmeans} package produces a similar result, but in matrix format rather than a heatmap visualization [@emmeans].  
+
+The mean idea here is that either the upper- or lower-triangle of a matrix can be used to visualize statistics relating to the pair of estimates identified by the row and column labels.  With `factorplot()`, the significance and direction of the difference is encoded in color and the numerical values of the difference (and optionally its standard error) are printed in each cell.  More in the spirit of @Villacorat_Saez_2015_SRCS, we could also encode the differences in color and convey significance in a different way (e.g., with a text annotation within the cell).  The diagonal and alternate triangle could also be used to convey information much as in the pairwise p-value matrix produce by `pwpm()`.  We demonstrate with a couple of examples. 
+
+## Chick Weights
+
+First, we use the `chickwts` data predicting the weight of chicks (`weight`) with feed type (`feed`).  To make the display easiest to read, we re-order the feed type factor by the average weight, which will make the intervals decreasing in their average.  The first step is to estimate the model: 
+
+```{r}
+data(chickwts)
+chickwts$feed <- reorder(chickwts$feed, 
+                         chickwts$weight, 
+                         FUN=mean)
+chick_mod <- lm(weight~ feed, data=chickwts)
+```
+
+First, we use the `pwpm()` function to show the matrix visualization.  The predicted values are on the diagonal, unadjusted p-values are in the upper-triangle entries and differences between pairs of estimates are in the lower-triangle.  This would tell a reader everything they might need to know about the pairwise differences, but doesn't scale especially well.  
+
+```{r}
+library(emmeans)
+chick_emm <- emmeans(chick_mod, ~ feed)
+pwpm(chick_emm, 
+     by = NULL, 
+     adjust = "none", 
+     type = "response")
+```
+Next, we look at the default output from the `factorplot()` function and its plotting method. 
+
+
+```{r chick-fp, fig.height=6.5, fig.width=6, out.width="75%", fig.align="center", fig.cap="Heatmap of Pairwise Differences in Chick Weights by Feed Type using `factorplot()`."}
+library(factorplot)
+chick_fp <- factorplot(chick_mod, factor.var="feed", order="size")
+plot(chick_fp)
+```
+
+The default output from `factorplot()` is not amenable for custom plotting.  The output from the plot method is a `ggplot`, so it can be adjusted to some degree with different `theme_` and `scale_` functions, but there are limits to the customizability with those functions.  The function `fp_to_df()` in the `factorplot` package makes a data frame that can be plotted. The main argument aside from the input object of class `factorplot` is the `type` argument which can be `"upper_tri"`, the default, which indicates that all information should be provided so as to populate the upper-triangle of the display.  If changed to `"bot_tri"` then the lower-triangle will contain the p-values and the upper-triangle the differences with estimates themselves on the main diagonal.  We show both options below. First, the upper-triangle orientation. 
+
+```{r}
+chick_df1 <- fp_to_df(chick_fp) 
+head(chick_df1)
+```
+
+We can then plot this with `ggplot2` using the `row` and `column` variables to identify the matrix display. In this case, we will plot encode the difference with color and use a flag in the cell to denote statistical significance. 
+
+```{r chick-fp2, fig.height=6.5, fig.width=6, out.width="75%", fig.align="center", fig.cap="Custom Heatmap of Pairwise Differences in Chick Weights by Feed Type Encoding Difference with Color. White asterisks indicate statistical significance at the 0.05 level (two-tailed)."}
+ggplot(chick_df1, aes(x=row, y=column)) + 
+  geom_tile(aes(fill = difference), color="black", linewidth=.25) + 
+  scale_fill_viridis_c(option = "D", na.value = "transparent") + 
+  geom_text(aes(label = ifelse(p_value < .05, "*", "")), 
+            color = "white", size = 6) + 
+  geom_text(data = filter(chick_df1, !is.na(estimate)), aes(label = sprintf("%.2f", estimate))) + 
+  theme_classic() + 
+  theme(axis.text.x = element_text(angle=45, hjust=1), 
+        legend.position = "top") + 
+  labs(x="", y="", fill="Difference")
+```
+
+Alternatively, we could feed predicted values and a variance-covariance matrix to `factorplot()` which would give absolute predictions rather than relative ones for the estimates (though the differences will stay the same).  
+
+```{r}
+library(marginaleffects)
+chick_preds <- predictions(chick_mod, variables="feed", by="feed")
+chick_b <- coef(chick_preds)
+names(chick_b) <- chick_preds$feed
+chick_fp2 <- factorplot(chick_b, var=vcov(chick_preds), order="size")
+chick_df1b <- fp_to_df(chick_fp2) 
+head(chick_df1b)
+```
+
+
+
+```{r chick-fp3, fig.height=6.5, fig.width=6, out.width="75%", fig.align="center", fig.cap="Custom Heatmap of Pairwise Differences in Chick Weights by Feed Type Encoding Difference with Color, Absolute Estimates.White asterisks indicate statistical significance at the 0.05 level (two-tailed)."}
+ggplot(chick_df1b, aes(x=row, y=column)) + 
+  geom_tile(aes(fill = difference), color="black", linewidth=.25) + 
+  scale_fill_viridis_c(option = "D", na.value = "transparent") + 
+  geom_text(aes(label = ifelse(p_value < .05, "*", "")), 
+            color = "white", size = 6) + 
+  geom_text(data = filter(chick_df1b, !is.na(estimate)), aes(label = sprintf("%.2f", estimate))) + 
+  theme_classic() + 
+  theme(axis.text.x = element_text(angle=45, hjust=1), 
+        legend.position = "top") + 
+  labs(x="", y="", fill="Difference")
+```
+
+Using the \CRANpkg{ggnewscale} package [@ggnewscale], we could plot both triangles in different color scales - one for differences and one for p-values. To do this, we will need to use `type="both_tri"` in the `fp_to_df()` function to get all the necessary information.
+
+```{r}
+chick_df2 <- fp_to_df(chick_fp2, type="both_tri")
+head(chick_df2)
+```
+
+```{r chick-fp4, fig.height=7, fig.width=6, out.width="75%", fig.align="center", fig.cap="Custom Heatmap of Pairwise Differences in Chick Weights by Feed Type Encoding Difference and p-values with Color in Alternating Triangles."}
+library(ggnewscale)
+chick_df2 <- chick_df2 %>% 
+  mutate(row = factor(as.character(row), levels=rev(levels(chickwts$feed))), 
+         column = factor(as.character(column), levels=levels(chickwts$feed)), 
+         significant = as.factor(ifelse(p_value < .05, "Significant", "Not Significant")))
+ggplot(chick_df2, aes(x=row, y=column)) + 
+  geom_tile(fill="transparent", color="black", linewidth=.25) + 
+  geom_tile(data= filter(chick_df2, type=="difference"), 
+            aes(fill = difference), color="black", linewidth=.25) +
+  scale_fill_viridis_c(option = "D", na.value = "transparent") + 
+  labs(fill = "Difference") + 
+  new_scale_fill() +
+  geom_tile(data= filter(chick_df2, type=="pval"), 
+            aes(fill = significant), color="black", linewidth=.25) +
+  scale_fill_manual(values=c("white", "gray50")) + 
+  labs(fill="p-value", x="", y="") + 
+  geom_text(data = filter(chick_df2, !is.na(estimate)), aes(label = sprintf("%.2f", estimate))) +
+  theme_classic() + 
+  theme(legend.position = "top", legend.box="vertical") 
+  
+```
+
+## UCB Admissions 
+
+
+Using the `UCBAdmissions` data, we can make a multi-panel display, in this case two panels - one for men and one for women. First, let's turn the dataset into something amenable for modeling and then run the model predicting admission rates by gender and department. 
+
+```{r}
+data(UCBAdmissions)
+
+ucb_dat <- as.data.frame(UCBAdmissions) %>% 
+  tidyr::pivot_wider(names_from = "Admit", values_from = "Freq") %>% 
+  mutate(Dept = as.factor(Dept))
+
+ucb_mod <- glm(cbind(Admitted, Rejected) ~ Gender * Dept, 
+               data=ucb_dat, family=binomial)
+```
+
+Here, we generate two different sets of predictions - one for males and one for females. The workflow is to generate a vector of values of the grouping variable (`Gender` here).  Then loop through them to generate predictions for each value, setting the value of the grouping variable to the current value in the loop in the `variables` argument.  Next, loop through the predictions, each time saving the estimates, naming them, saving the variance-covariance matrix, calling `factorplot()` on the results and then turning that into a data frame. In the end, we can put all the data frames together with `dplyr::bind_rows()`.  
+
+```{r}
+gen_list <- c("Male", "Female")
+pred_list <- lapply(gen_list, \(g)predictions(ucb_mod, 
+            variables = list("Dept" = levels(ucb_dat$Dept), 
+                             "Gender" = g), 
+            by="Dept"))
+names(pred_list) <- gen_list
+df_list <- lapply(pred_list, \(x){
+  b <- coef(x)
+  names(b) <- x$Dept
+  v <- vcov(x)
+  fp <- factorplot(b, var=v)
+  fp_to_df(fp, type="upper_tri")
+})
+ucb_df <- bind_rows(df_list, .id="Gender")
+ucb_df <- ucb_df %>% 
+  mutate(across(c(row, column), ~as.factor(as.character(.x))))
+```
+
+We can then make the plot just like above, but with a `facet_wrap(~Gender)`, which will separate the two panels.  
+
+```{r ucb-mf, fig.height=6, fig.width=10, out.width="100%", fig.align="center", fig.cap="Heatmaps of Predicted Admission Rates to UCB by Gender and Department with Pairwise Differences Encoded with Color. White asterisks indicate statistical significance at the 0.05 level (two-tailed)."}
+ggplot(ucb_df, aes(x=row, y=forcats::fct_rev(column), fill=difference)) + 
+  geom_tile(color="black", linewidth=.25) + 
+  geom_text(aes(label = ifelse(p_value < .05, "*", "")), 
+            color = "white", size = 6) +
+  geom_text(data=filter(ucb_df, !is.na(estimate)), 
+            aes(label = sprintf("%.2f", estimate))) +
+  scale_fill_viridis_c(na.value = "transparent") + 
+  theme_classic() + 
+  facet_wrap(~Gender, nrow=1) + 
+  theme(legend.position="top") + 
+  labs(x="", y="", fill="Difference")
+```
+
+
+
+
+## References 

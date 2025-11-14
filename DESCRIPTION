@@ -1,6 +1,6 @@
 Package: VizTest
 Title: Optimal Confidence Intervals for Visual Testing
-Version: 0.5
+Version: 0.6
 Authors@R: 
     c(person("Dave", "Armstrong", , email="davearmstrong.ps@gmail.com", role = c("aut", "cre"),
            comment = c(ORCID = "0000-0002-9358-2489")),
@@ -19,11 +19,15 @@ Suggests:
     carData,
     collapse,
     factorplot,
+    forcats, 
+    ggnewscale, 
+    ggsignif, 
     knitr,
     lme4,
     marginaleffects,
     mvtnorm,
     patchwork,
+    psre, 
     rmarkdown,
     sandwich,
     testthat (>= 3.0.0),

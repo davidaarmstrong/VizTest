@@ -1,0 +1,130 @@
+---
+title: "Pairwise Comparisons with Significance Brackets"
+author: "Dave Armstrong and William Poirier"
+date: "`r Sys.Date()`"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Pairwise Comparisons with Significance Brackets}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>", 
+  message = FALSE, 
+  warning = FALSE
+)
+```
+
+Significance brackets are lines or brackets that connect two estimates with a notation indicating the significance (or lack thereof) of the difference between the two estimates.  These are commonly used in plots and can make comparisons easier to understand.  When considering any pair of estimates with confidence intervals, there are three states the pair of intervals could be in: 
+
+1. Non-overlapping: non-overlapping intrevals indicate a significant difference between the two estimates. 
+2. Overlapping, but Significant: in some cases, estimates with overlapping intervals can nonetheless be significantly different from each other.  The amount of overlap is not necessarily indicative of a difference or not - that depends on the standard errors and covariance of the estimates. 
+3. Overlapping and Not Significant: in other cases, esitmates with overlapping confidence intervals are not significantly different from each other.  
+
+We propose that significance brackets could be used to identify either the second or third groups.  First, no significance brackets are needed for intervals that do not overlap, their significance is obvious.  So, significance brackets only need to be used on pairs of estimates with overlapping intervals.  To minimize visual clutter, we could flag overlapping pairs of intervals that are statistically significantly different from each other noting that all un-flagged pairs are not statistically different from each other. Likewise, the converse could be done - flagging insignificant differences and noting that all other overlapping pairs are significant.  The idea would be to use whichever approach generates fewer intervals.  That said, even this method does not scale particularly well as the number of intervals gets large.  We demonstrate this idea on several examples below. 
+
+## Chick Weights
+
+We first demonstrate the procedure using the `chickwts` built-in dataset.  The first step is to generate the estimates, we predict chicken weight (`weight`) with feed type (`feed`).  To make the display easiest to read, we re-rorder the feed type factor by the average weight, which will make the intervals decreasing in their average. 
+
+```{r}
+data(chickwts)
+chickwts$feed <- reorder(chickwts$feed, 
+                         chickwts$weight, 
+                         FUN=mean)
+chick_mod <- lm(weight~ feed, data=chickwts)
+```
+
+In the \CRANpkg{VizTest} package, we have a function called `make_annotations()` that makes a list of annotations amenable for use in `geom_signif()` from the \CRANpkg{ggsignif} package. First, the user must executive the `viztest()` function on the estimates. 
+
+```{r}
+library(marginaleffects)
+library(VizTest)
+## make predictions 
+chick_preds <- predictions(chick_mod, variables="feed", by="feed")
+
+## save predicted values in chick_b
+chick_b <- coef(chick_preds)
+
+## set names of predicted values
+names(chick_b) <- chick_preds$feed
+
+## make into visual testing data
+chick_vt_data <- make_vt_data(est=chick_b, vcov(chick_preds))
+
+## execute viztest function on predictions
+chick_vt <- viztest(chick_vt_data, include_zero=FALSE)
+```
+
+The default for `make_annotations()` is to figure out which approach will produce fewer annotations - flagging overlapping insignificant differences or flagging overlapping significant differences and then return the one with fewer annotations.  This is the `type="auto"` option.  If you choose `type="significant"` the function will return annotations for the overlapping significant differences and if you choose `type="insignificant"` it will return annotations for the overlapping insignificant differences.  Here, we use the default `type="auto"` option.
+
+```{r}
+chick_annots <- make_annotations(chick_vt)
+chick_annots
+```
+Now, we can use the annotations as input to `geom_signif()` to add the significance brackets to a plot of the estimates. Note that `make_annotations()` makes a list that has named elements with names that are the same as the arguments to `geom_signif()`.  The easiest way to use those as arguments is to use `do.call()` as shown below.  For the uninitiated, `do.call()` takes as its first argument an unevaluated function (like `geom_signif`) and as its second argument a named list of arguments to be passed to that function.  
+
+```{r chick-sig, fig.width=6, fig.height=6, fig.align="center", out.width="75%", fig.cap="Predicted Chick Weights with 95% Confidence Intervals and Insignificance Brackets.  The estimates in pairs marked 'NS' are not significantly different from each other.  All other pairs are statistically different from each other whether the intervals overlap or not." }
+library(ggsignif)
+ggplot(chick_preds, aes(x=feed, y=estimate)) +
+  geom_pointrange(aes(ymin=conf.low, ymax=conf.high)) +
+  do.call(geom_signif, chick_annots) +
+  labs(
+    x = "Feed Type",
+    y = "Predicted Weight"
+  ) + 
+  theme_bw()
+```
+
+
+## Ornstein Data
+
+The Ornstein data in the \CRANpkg{carData} package contains measures of the assets of ten different sectors in four different nations along with the number of interlocking director and executive positions shared with other firms.  We estimate a generalized linear model model of interlocks as a function of assets, sector and nation.  We then generate predictions for nation and make the letter display. 
+
+```{r}
+## Load Data
+data(Ornstein, package="carData")
+
+## Estimate Model
+orn_mod <- glm(interlocks ~ log2(assets) + sector + nation, data=Ornstein, 
+    family=poisson)
+
+## Generate Predictions
+orn_preds <- predictions(orn_mod, variables = "sector", by = "sector")
+```
+
+```{r orn-annot1, fig.height=6, fig.width=6, out.width="75%", fig.align="center", fig.cap="Predicted Number of Interlocks by Sector with 95% Confidence Intervals and Significance Brackets.  The estimates in pairs marked with asterisks are significantly different from each other.  All other overlapping pairs are not significantly different from each other." }
+orn_b <- coef(orn_preds)
+names(orn_b) <- orn_preds$sector
+orn_vt_data <- make_vt_data(est=orn_b, vcov(orn_preds))
+orn_vt <- viztest(orn_vt_data, include_zero=FALSE)
+orn_annots <- make_annotations(orn_vt, adjust="none")
+
+ggplot(orn_preds, aes(x=sector, y=estimate)) +
+  geom_pointrange(aes(ymin=conf.low, ymax=conf.high)) +
+  do.call(geom_signif, orn_annots) +
+  labs(
+    x = "Sector",
+    y = "Predicted Number of Interlocks"
+  ) + 
+  theme_bw()
+```
+
+Sometimes, particularly when there are more than a few estiamtes, the y-position of the annotations will need a bit of nudging to make the gaps between brackets more visually appealing.  This can be done either by directly adjusting the `y_position` element of the annotations list or by using the `nudge` argument in the call to `make_annotations()`.  To do the latter, normally you would need to use some trial and error to ensure the right amount of nudging is applied.  The call to `make_annotations()` below is the result of such trial and error.  
+
+```{r orn-annot2, fig.height=6, fig.width=6, out.width="75%", fig.align="center", fig.cap="Predicted Number of Interlocks by Sector with 95% Confidence Intervals and Nudged Significance Brackets."}
+orn_annots <- make_annotations(orn_vt, adjust="none", 
+                               nudge=c(2, 1, 2, 0,0) )
+
+ggplot(orn_preds, aes(x=sector, y=estimate)) +
+  geom_pointrange(aes(ymin=conf.low, ymax=conf.high)) +
+  do.call(geom_signif, orn_annots) +
+  labs(
+    x = "Sector",
+    y = "Predicted Number of Interlocks"
+  ) + 
+  theme_bw()
+```
