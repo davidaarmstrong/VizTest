@@ -18,7 +18,7 @@ Imports:    dplyr,
 Suggests: 
     carData,
     collapse,
-    factorplot,
+    factorplot (>= 1.3),
     forcats, 
     ggnewscale, 
     ggsignif, 
