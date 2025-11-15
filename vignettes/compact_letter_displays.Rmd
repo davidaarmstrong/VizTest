@@ -69,6 +69,7 @@ lmat_df
 Now that we have the letter matrices, we can make the plots.  The `letter_plot()` function takes two arguments: a data frame with columns `x` (the grouping variable) and `predicted` (the predicted values), and the letter matrix.  We first prepare the data frame of predictions.  We need to rename the relevant variables first
 
 ```{r}
+
 library(dplyr)
 chick_preds_dat <- chick_preds %>% 
   as.data.frame() %>% 
@@ -80,6 +81,7 @@ Finally, we can make the figure
 
 ```{r chick-letter, fig.width=6, fig.height=4, fig.align="center", fig.cap="Predicted chick weights by feed type with 95% confidence intervals and a compact letter display"}
 library(psre)
+library(ggplot2)
 letter_plot(chick_preds_dat, lmat_gl)
 ```
 

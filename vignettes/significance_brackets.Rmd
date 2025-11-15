@@ -68,6 +68,7 @@ chick_annots
 Now, we can use the annotations as input to `geom_signif()` to add the significance brackets to a plot of the estimates. Note that `make_annotations()` makes a list that has named elements with names that are the same as the arguments to `geom_signif()`.  The easiest way to use those as arguments is to use `do.call()` as shown below.  For the uninitiated, `do.call()` takes as its first argument an unevaluated function (like `geom_signif`) and as its second argument a named list of arguments to be passed to that function.  
 
 ```{r chick-sig, fig.width=6, fig.height=6, fig.align="center", out.width="75%", fig.cap="Predicted Chick Weights with 95% Confidence Intervals and Insignificance Brackets.  The estimates in pairs marked 'NS' are not significantly different from each other.  All other pairs are statistically different from each other whether the intervals overlap or not." }
+library(ggplot2)
 library(ggsignif)
 ggplot(chick_preds, aes(x=feed, y=estimate)) +
   geom_pointrange(aes(ymin=conf.low, ymax=conf.high)) +
