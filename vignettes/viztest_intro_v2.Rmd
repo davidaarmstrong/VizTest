@@ -1,0 +1,350 @@
+---
+title: "Introduction to VizTest: Optimal Confidence Intervals for Visual Testing"
+date: "2025-03-10"
+author:  
+  - name: William Poirier
+    affiliation: Western University
+    address:
+    - Department of Political Science
+    - London, Canada
+    url: https://williampo1.github.io/
+    orcid: 0000-0002-3274-1351
+    email:  wpoirier@uwo.ca
+  - name: David A. Armstrong
+    affiliation: Western University
+    address:
+    - Department of Political Science
+    - London, Canada
+    url: https://www.quantoid.ca/
+    orcid: 0000-0002-9358-2489
+    email: dave.armstrong@uwo.ca
+bibliography: RJreferences.bib
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Introduction to VizTest: Optimal Confidence Intervals for Visual Testing}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>", 
+  message = FALSE,
+  warning = FALSE
+)
+library(ggplot2) #
+#### 0. Initialization ####
+# remotes::install_github('davidaarmstrong/VizTest')
+library(VizTest)
+
+# Datasets from
+library(wooldridge) #
+library(carData) #
+
+# For wrangling and analysis
+library(dplyr) #
+library(tidyr) #
+library(ggplot2)
+library(patchwork) #
+library(lme4) #
+library(marginaleffects) #
+library(multcomp) #
+```
+
+## Introduction
+
+The \CRANpkg{VizTest} package provides methods for visualizing pairwise comparisons.  We propose a method for building inferential confidence intervals that allow readers to visually test whether two estimates are statistically different from each other by evaluating the (non-)overlaps in the inferential confidence intervals.  The idea of inferential confidence intervals is relatively simple.  First, we imagine that you want to do pairwise tests of estimates at the $\alpha$ level.  The normal workflow would be to present $(1-\alpha)\times 100\%$ confidence intervals around each of the estimates.  It has been shown by various different scholars [@browne79,@tukey1991,@godlstein_healey_95,@schenker_gentleman_2001,@payton_2003,@afshartous_2010,@radean2023] that using (non-)overlaps in the the $(1-\alpha)\times 100\%$ confidence intervals to evaluate whether differences are statistically significant or not is problematic and can lead to erroneus inferences.  We know that when intervals do not overlap, that the estimates are statistically different from each other, but the converse is not necessarily true. We propose that there may be a different confidence interval $(1-\gamma)\times 100\%$ such that whether the intervals overlap or not corresponds perfectly (or as closely as possible) to whether the pairwise tests are statistically significant or not.  We call thes $(1-\gamma)\times 100\%$ confidence intervals - Inferential Confidence Intervals.  Our paper [@armstrong_2025] discusses this method in more detail and our paper in the **JOURNAL** provides more detail about the implementation of the methods in R [@poirier_viztest_2025]. 
+
+Below, we walk through a few different examples that should get you started using the package, though the paper in the **JOURNAL** provides more details. 
+
+## Descriptive Statistics: Chick Weights
+
+We start with a simple example using the `chickwts` dataset that is included in base R.  This dataset contains weights of chicks (`weight`) fed with different types of feed (`feed`).  First we re-order the `feed` variable so that the values will be increasing in average weight.  We then calculate average weight, standard deviation of weights, sample size and then calculate the standard error - the square root of the sampling variance. 
+
+```{r}
+data(chickwts)
+chickwts$feed <- reorder(chickwts$feed, 
+                         chickwts$weight, 
+                         FUN=mean)
+chick_preds <- chickwts %>% 
+  group_by(feed) %>% 
+  summarise(ave_weight = mean(weight),
+            n = n(),
+            sd = sd(weight)) %>%
+  mutate(se = sd/sqrt(n))
+chick_est <- chick_preds$ave_weight
+names(chick_est) <- chick_preds$feed
+```
+
+We can make the results amenable to using the `viztest()` function by using `make_vt_data()`, which, in this case, requires `estimates` and either a vector of variances or a variance-covariance matrix in `variances`. We use the default, `type="est_var"`, though there is a simulation option available. 
+
+```{r}
+chick_vt_data <- make_vt_data(estimates = chick_est, variances = chick_preds$se^2, type="est_var")
+```
+
+We then use the `viztest()` function from the \CRANpkg{VizTest} package to calculate the optimal inferential confidence intervals. 
+
+```{r}
+chick_vt <- viztest(chick_vt_data, include_zero = FALSE)
+chick_vt
+```
+
+Here, we see that any confidence level between $78\%$ and $87\%$ will yield inferential confidence intervals whose (non-)overlaps correspond perfectly with the pairwise tests.  Our papers [@armstrong_2025,@poirier_viztest_2025] discuss how these levels are calculated in more detail and why we choose the one labeled "Easiest", which we argue makes the comparisons easiest to distinguish visually.  We could use the plot method on our `viztest` object: 
+
+```{r chick-plot1, fig.height=4, fig.width=6, out.width="75%", fig.cap="Chick Weights with Inferential COnfidence Intervals (wide gray bars) and standard 95% confidence interval (thin black line).  If the gray bars overlap, it indicates the pair of estimates whose intervals overlap are not statistically different from each other.  If the gray bars do not overlap, the pair of estimates are statistically different from each other."}
+plot(chick_vt)
+```
+
+## Coefficient Plot: Wooldridge GPA data. 
+
+Using the `gpa1` data from the \CRANpkg{wooldridge} package, we can predict university GPA (`colGPA`) with variables `skipped` (average classes skipped per week), `alcohol` (average number of days per week drinking alcohol), `PC` (has a personal computer at school), `male` (male binary variable), `car` (has a car binary variable), and `job20` (works more than 20 hours per week binary variable).  We fit the model below:
+
+
+```{r}
+data(gpa1, package="wooldridge")
+model1 <- lm(colGPA~skipped+alcohol+PC+male+car+job20,data=gpa1)
+summary(model1)
+
+```
+
+The `viztest()` function will take any object that has a `coef()` and `vcov()` method, so we can input the model directly if we want to make a coefficient plot.  There is an `include_zero` option as well as an `include_intercept` option that can be set to `TRUE` or `FALSE`.   By default, the function returns standard confidence intervals (e.g., $95\%$) along with the appropriate visual testing intervals.  The standard intervals will capture tests relative to zero, so unless you are only presenting the visual testing intervals, you may want to set `include_zero=FALSE`.  
+
+```{r}
+gpa_vt <- viztest(model1, test_level = 0.05, 
+                  range_levels = c(0.25,0.99), 
+                  level_increment = 0.01, 
+                  include_zero=FALSE)
+
+gpa_vt
+
+```
+
+Any level betwee $73\%$ and $84\%$ would work, but $80\%$ will be the easiest to interpret visually.  If we want a bit more control over plotting the results, we can have the plot method return the data and then make a custom plot ourselves.  This would allow us to order the estimates by size if they are not that way naturally. 
+
+```{r gpa1, fig.height=6.5, fig.width=6, out.width="75%", fig.cap="GPA Model Coefficients with Inferential Confidence Intervals (80%, wide gray bars) and standard 95% confidence interval (thin black line).  If the gray bars overlap, it indicates the pair of estimates whose intervals overlap are not statistically different from each other.  If the gray bars do not overlap, the pair of estimates are statistically different from each other.",}
+plot(gpa_vt, make_plot = FALSE) %>%
+  mutate(vbl = factor(vbl), 
+         vbl = reorder(vbl, est)) %>%
+  ggplot(aes(x = est, y = vbl)) +
+  geom_vline(xintercept = 0, linetype="dashed", color="black") +
+  geom_linerange(aes(xmin = lwr, xmax = upr, color="Optimal Visual Testing Intervals (80%)", linewidth="Optimal Visual Testing Intervals (80%)")) +
+  geom_linerange(aes(xmin = lwr_add, xmax = upr_add, color="Standard Confidence Interval (95%)", linewidth="Standard Confidence Interval (95%)")) +
+  geom_point(size=3) +
+  scale_color_manual(values=c("gray75", "black")) + 
+  scale_linewidth_manual(values=c(3.5, .5)) + 
+  labs(x = "Coefficient Estimate", y = "",
+       color = "", linewidth="") +
+  theme_classic() + 
+  theme(legend.position="top", 
+        legend.box="vertical")
+```
+
+If you were trying to make a forest plot, where the symbol shapes and sizes varied by some other variable, you could merge the relevant data into the data output from `plot(..., make_plot=FALSE)` and map the size and shape aesthetics in `geom_point()` to the appropriate variables. 
+
+## Predicted Probabilities: Titanic Data
+
+Any quantity whose uncertainty can be appropriately captured could be subjected to the `viztest()` function.  Consider the `TitanicSurvival` data from the \CRANpkg{carData} package.  Here, we model survival with a binomial GLM controlling for passenger class and the interaction of sex and age category. We generate predictions for the combinations of gender and age groups using the `avg_predictions()` function from the \CRANpkg{marginaleffects} package. 
+
+
+```{r}
+data(TitanicSurvival, package="carData")
+NewTitanicSurvival <- TitanicSurvival %>% 
+  mutate(ageCat = case_when(age <= 10 ~ "0-10",
+                            age > 10 & age <=18 ~ "11-18",
+                            age > 18 & age <=30 ~ "19-30",
+                            age > 30 & age <=40 ~ "31-40",
+                            age > 40 & age <=50 ~ "41-50",
+                            age >50 ~ "51+"))
+# The model
+model3 <- glm(survived~sex*ageCat+passengerClass,
+              data=NewTitanicSurvival,family = binomial(link="logit")) 
+```
+
+Using the default settings in `avg_predictions()` we get results on the response scale with standard errors using the delta method.  We could then do normal theory tests on the predicted probabilities using the `viztest()` function.  Further, we have two options here - use all estimates as input to the `viztest()` function in which case all pairwise tests will be conducted - both across and within gender groups.  The effects could also be calculated independently and then `viztest()` executed individually for each group.  In that case, only within-group comparisons would be valid.  We show both ways below. 
+
+```{r}
+## all pairwise tests
+mes <- avg_predictions(model3, 
+                variables = list(ageCat = levels(NewTitanicSurvival$ageCat),
+                                 sex=levels(NewTitanicSurvival$sex)))
+
+all_vt <- viztest(mes, include_zero=FALSE)
+plot_data <- plot(all_vt, make_plot=FALSE) %>% 
+  dplyr::select(est, lwr, upr, lwr_add, upr_add) 
+mes <- mes %>% 
+  as.data.frame() %>% 
+  left_join(plot_data, by = join_by(estimate == est)) 
+```
+
+```{r titanic1, fig.height=8, fig.width=6, out.width="75%", fig.cap="Predicted Probabilities of Survival on the Titanic with Inferential Confidence Intervals (91%, wide gray bars) and standard 95% confidence interval (thin black line).  If the gray bars overlap, it indicates the pair of estimates whose intervals overlap are not statistically different from each other.  If the gray bars do not overlap, the pair of estimates are statistically different from each other. Tests were done using normal-theory on the response scale with standard errors computed by the delta method.  Comparisons both within and across panels are valid. "}
+ggplot(mes, aes(x=estimate, y = ageCat)) + 
+  geom_linerange(aes(xmin = lwr, xmax = upr, color="Optimal Visual Testing Intervals (91%)", linewidth="Optimal Visual Testing Intervals (91%)")) +
+  geom_linerange(aes(xmin = lwr_add, xmax = upr_add, color="Standard Confidence Intervals (95%)", linewidth="Standard Confidence Intervals (95%)")) +
+  geom_point(size=3) + 
+  scale_color_manual(values=c("gray75", "black")) +
+  scale_linewidth_manual(values=c(3.5, .5)) + 
+  facet_grid(sex~.) +
+  theme_classic() + 
+  theme(legend.position="top") + 
+  labs(x="Predicted Pr(Survival)", y="Age Category",
+       color="", linewidth="")
+```
+
+Likely, the response scale is the wrong scale on which to do normal-theory tests.  Instead, we should probably do them on the link scale.  Changing the `type` argument in `avg_predictions()` to `"link"` will do this for us.  Then, we can run `viztest()` again and the tests will be on the appropriate scale.  The results do change a bit here.  All tests are accounted for by the (non-)overlaps, but on the response scale, the range of valid testing intervals is from $84\%$ to $95\%$.  On the link scale, the range is from $82\%$ to $93\%$.  
+
+```{r}
+## all pairwise tests
+mes_link <- avg_predictions(model3, 
+                variables = list(ageCat = levels(NewTitanicSurvival$ageCat),
+                                 sex=levels(NewTitanicSurvival$sex)), 
+                type="link")
+
+all_vt <- viztest(mes_link, include_zero=FALSE)
+```
+
+We could subject the estimates as well as the lower and upper confidence interval bounds to the inverse logit transform to get from the link scale to the response scale.  This could be accomplished with either `plogis()` because we know this was a binary logistic regression, or more generally for the GLM object `model3`, we could use `model3$family$linkinv()`.  Here, we use `plogis()`.
+
+```{r}
+plot_data <- plot(all_vt, make_plot=FALSE) %>% 
+  dplyr::select(est, lwr, upr, lwr_add, upr_add) 
+mes_resp <- mes_link %>% 
+  as.data.frame() %>% 
+  left_join(plot_data, by = join_by(estimate == est)) %>%
+  mutate(across(c(estimate, lwr, upr, lwr_add, upr_add), plogis))
+```
+
+Then, we could make the plot.  Notice, the non-linear transformation into the response space makes the confidence intervals on that scale asymmetric - especially those closer to the bounds of 0 and 1. In this case, we do the tests on the appropriate scale and then transform the estimates and the bounds into the response space.  
+
+```{r titanic2, fig.height=8, fig.width=6, out.width="75%", fig.cap="Predicted Probabilities of Survival on the Titanic with Inferential Confidence Intervals (88%, wide gray bars) and standard 95% confidence interval (thin black line).  If the gray bars overlap, it indicates the pair of estimates whose intervals overlap are not statistically different from each other.  If the gray bars do not overlap, the pair of estimates are statistically different from each other. Tests were done using normal-theory on the link scale.  Comparisons both within and across panels are valid. "}
+ggplot(mes_resp, aes(x=estimate, y = ageCat)) + 
+  geom_linerange(aes(xmin = lwr, xmax = upr, color="Optimal Visual Testing Intervals (88%)", linewidth="Optimal Visual Testing Intervals (88%)")) +
+  geom_linerange(aes(xmin = lwr_add, xmax = upr_add, color="Standard Confidence Intervals (95%)", linewidth="Standard Confidence Intervals (95%)")) +
+  geom_point(size=3) + 
+  scale_color_manual(values=c("gray75", "black")) +
+  scale_linewidth_manual(values=c(3.5, .5)) + 
+  facet_grid(sex~.) +
+  theme_classic() + 
+  theme(legend.position="top") + 
+  labs(x="Predicted Pr(Survival)", y="Age Category",
+       color="", linewidth="")
+
+```
+Another alternative here would be to use the simulation method.  We could get simulation output using the `inferences()` function from the \CRANpkg{marginaleffects} package. 
+
+```{r}
+mes_sim <- avg_predictions(model3, 
+                variables = list(ageCat = levels(NewTitanicSurvival$ageCat),
+                                 sex=levels(NewTitanicSurvival$sex))) %>% 
+  inferences(method="simulation", R=1000)
+```
+
+We can extract the posterior draws from the `inferences` object and then use `make_vt_data()` with `type="sim"` to prepare the data for `viztest()`.  In the output below, you can see that using the simulation method, the range between $84\%$ and $93\%$ gives inferential credible intervals whose (non-)overlaps correspond perfectly with the Bayesian pairwise tests.  In this framework, two estimates are credibly different if the posterior probability that the estimate with the larger posterior mean is larger than the estimate with the smaller posterior mean is greater than $1-\alpha$.
+
+```{r}
+post <- posterior_draws(mes_sim) %>% dplyr::select(drawid, draw, ageCat, sex) %>% 
+  pivot_wider(names_from = "drawid", values_from = "draw", names_prefix="draw")
+sim <- post %>% dplyr::select(starts_with("draw")) %>% as.matrix() %>% t()
+colnames(sim) <- paste0("b", 1:ncol(sim))
+sim_vt_data <- make_vt_data(sim, type="sim")
+all_vt_sim <- viztest(sim_vt_data, include_zero=FALSE)
+all_vt_sim
+```
+
+We make the plot data below.  We select the relevant variables and ensure that the data frame is sorted in the original order.  This works here because the `vbl` variable is b1-b12 and we can sort by the numeric part of that string.  We then bind the plot data to the original `mes_sim` data frame for plotting.
+
+```{r}
+plot_data <- plot(all_vt_sim, make_plot=FALSE) %>% 
+  dplyr::select(vbl, est, lwr, upr, lwr_add, upr_add) %>% 
+  arrange(as.numeric(gsub("b", "", vbl)))
+mes_sim <- mes_sim %>% 
+  as.data.frame() %>% 
+  bind_cols(plot_data) 
+```
+
+Finally, we can make the plot. 
+
+```{r titanic3, fig.height=8, fig.width=6, out.width="75%", fig.cap="Predicted Probabilities of Survival on the Titanic with Inferential Credible Intervals (89%, wide gray bars) and standard 95% credible interval (thin black line).  If the gray bars overlap, it indicates the pair of estimates whose intervals overlap are not credibly different from each other.  If the gray bars do not overlap, the pair of estimates are credibly different from each other. Tests were done using quasi-Bayesian simulation with quantile credible intervals on the response scale. Comparisons both within and across panels are valid. "}
+ggplot(mes_sim, aes(x=estimate, y = ageCat)) + 
+  geom_linerange(aes(xmin = lwr, xmax = upr, color="Optimal Visual Testing Intervals (89%)", linewidth="Optimal Visual Testing Intervals (89%)")) +
+  geom_linerange(aes(xmin = lwr_add, xmax = upr_add, color="Standard Credible Intervals (95%)", linewidth="Standard Credible Intervals (95%)")) +
+  geom_point(size=3) + 
+  scale_color_manual(values=c("gray75", "black")) +
+  scale_linewidth_manual(values=c(3.5, .5)) + 
+  facet_grid(sex~.) +
+  theme_classic() + 
+  theme(legend.position="top") + 
+  labs(x="Predicted Pr(Survival)", y="Age Category",
+       color="", linewidth="")
+```
+
+In all three Titanic examples above, comparisons both within and across panels are valid because we used all 12 estimates as input to `viztest()`.  This means that the (non-)overlaps of the 66 possible pairs of intervals correspond perfectly with the pairwise tests.  In some cases, this may be either unnecessary or because of some idiosyncrasies of the data, no interval perfectly captures the tests across groups, but the within-group tests can be perfectly captured (and the within-group tests are of greatest interest).  You can generate these by making separate predictions for each group and subjecting each group's predictions to `viztest()`.  Below is a workflow that should work generally. 
+
+First, make a vector of values of the group variable. 
+
+```{r}
+sex_vals <- c("female", "male")
+```
+
+Next, use a loop (either a `for` loop, `lapply()` or `map()`) to generate the predictions for each group.  We use `lapply()` below. 
+
+```{r}
+preds <- lapply(sex_vals, \(s){
+  avg_predictions(model3, newdata=datagrid(sex = s, grid_type="counterfactual"), 
+                  variables="ageCat")
+})
+```
+Next, we can use another loop to subject each element of the `preds` list to `viztest()`. To make our lives a bit easier, we will save the predictions and name them so that `plot()` called on the object will use those same names.  We use `lapply()` again.
+
+```{r}
+names(preds) <- sex_vals
+group_vt <- lapply(preds, \(p){
+  est <- p$estimate
+  names(est) <- p$ageCat
+  d <- make_vt_data(est, vcov(p), type="est_var")
+  viztest(d, include_zero=FALSE)
+})
+```
+
+We can see the results of the individual `viztest()` runs by printing `group_vt`: 
+
+```{r}
+group_vt
+```
+
+We could then get the plot data for both objects, bind them together and merge with the original estimates data. 
+```{r}
+plot_data <- lapply(names(group_vt), \(g){
+  d <- plot(group_vt[[g]], make_plot=FALSE, level = ifelse(g == "female", "median", "ce")) %>% 
+    dplyr::select(vbl, est, lwr, upr, lwr_add, upr_add) 
+  d
+})
+names(plot_data) <- sex_vals
+plot_data <- bind_rows(plot_data, .id="sex") %>% 
+  rename(ageCat = vbl)
+
+preds <- preds %>% 
+  bind_rows(.id="sex") %>% 
+  as.data.frame() %>% 
+  left_join(plot_data)
+```
+Finally, we could make the plot: 
+
+```{r titanic4, fig.height=8, fig.width=6, out.width="75%", fig.cap="Predicted Probabilities of Survival on the Titanic with Inferential Confidence Intervals (wide gray bars, 91% for males and 73% for females) and standard 95% confidence interval (thin black line).  If the gray bars overlap, it indicates the pair of estimates whose intervals overlap are not statistically different from each other.  If the gray bars do not overlap, the pair of estimates are statistically different from each other. Tests were done using normal-theory on the response scale with standard errors computed by the delta method.  Intervals were built so comparisons within, but not across panels are valid. "}
+ggplot(preds, aes(x=estimate, y = ageCat)) + 
+  geom_linerange(aes(xmin = lwr, xmax = upr, color="Optimal Visual Testing Intervals (91%)", linewidth="Optimal Visual Testing Intervals (91%)")) +
+  geom_linerange(aes(xmin = lwr_add, xmax = upr_add, color="Standard Confidence Intervals (95%)", linewidth="Standard Confidence Intervals (95%)")) +
+  geom_point(size=3) + 
+  scale_color_manual(values=c("gray75", "black")) +
+  scale_linewidth_manual(values=c(3.5, .5)) + 
+  facet_grid(sex~.) +
+  theme_classic() + 
+  theme(legend.position="top") + 
+  labs(x="Predicted Pr(Survival)", y="Age Category",
+       color="", linewidth="")
+```
+
+More examples are available in the accompanying papers [@poirier_viztest_2025,@armstrong_2025] as well as in the package documentation.
+
+
+# References

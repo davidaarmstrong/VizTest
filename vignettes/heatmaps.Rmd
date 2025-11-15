@@ -3,7 +3,7 @@ title: "Heatmaps for Pairwise Significance Testing"
 author: "Dave Armstrong and William Poirier"
 date: "`r Sys.Date()`"
 output: rmarkdown::html_vignette
-bibliography: vrefs.bib
+bibliography: RJreferences.bib
 vignette: >
   %\VignetteIndexEntry{Heatmaps for Pairwise Significance Testing}
   %\VignetteEngine{knitr::rmarkdown}
