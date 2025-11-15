@@ -25,6 +25,7 @@ Suggests:
     knitr,
     lme4,
     marginaleffects,
+    multcompView,
     mvtnorm,
     patchwork,
     psre, 
