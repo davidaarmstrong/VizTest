@@ -111,7 +111,7 @@ Ornstein <- Ornstein %>%
               dplyr::select(sector, estimate)) %>% 
   ## re-order factor 
   mutate(sector = reorder(sector, estimate, mean)) %>% 
-  select(-estimate)
+  dplyr::select(-estimate)
 
 ## update model
 imod <- update(imod, data=Ornstein)
