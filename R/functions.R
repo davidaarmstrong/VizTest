@@ -99,6 +99,22 @@ viztest.default <- function(obj,
   bhat <- coef(obj)
   if(is.null(names(bhat)))names(bhat) <- 1:length(bhat)
   V <- vcov(obj)
+  if(any(is.na(bhat))){
+    na_coef <- which(is.na(bhat))
+    if(inherits(V, "matrix")){
+      na_var <- which(apply(V, 1, \(x)all(is.na(x))))
+    }else{
+      na_var <- which(is.na(V))
+    }
+    coef_var_agree <- try(all(na_var == na_coef), silent=TRUE)
+    if(!inherits(coef_var_agree, "try-error")){
+      bhat <- bhat[-na_coef]
+      V <- V[-na_var, -na_var]
+      message(paste0("Rank-deficient model detected - parameter name(s):", paste(names(na_coef), collapse=", "), " removing NAs from estimates/variances and proceeding.\n"))
+    }else{
+      stop("NAs found in estimates and/or variances, but they are not in compatible places, please solve the problem and try again.\n")
+    }
+  }
   if(!is_pd(V, tol=tol)){
     stop("Variance-covariance matrix is not positive definite.  Cannot proceed with viztest().\n")
   }
@@ -472,6 +488,22 @@ make_vt_data <- function(estimates, variances=NULL, type=c("est_var", "sim"), to
     if(inherits(variances, "matrix")){
       if (nrow(variances) != length(estimates) | ncol(variances) != length(estimates)){
         stop("Variance-covariance matrix must have the same number of rows and columns as there are elements in the estimates vector.\n")
+      }
+    }
+    if(any(is.na(estimates))){
+      na_coef <- which(is.na(estimates))
+      if(inherits(variances, "matrix")){
+        na_var <- which(apply(variances, 1, \(x)all(is.na(x))))
+      }else{
+        na_var <- which(is.na(variances))
+      }
+      coef_var_agree <- try(all(na_var == na_coef), silent=TRUE)
+      if(!inherits(coef_var_agree, "try-error")){
+        estimates <- estimates[-na_coef]
+        variances <- variances[-na_var, -na_var]
+        message(paste0("Rank-deficient model detected - parameter name(s):", paste(names(na_coef), collapse=", "), " removing NAs from estimates/variances and proceeding.\n"))
+      }else{
+        stop("NAs found in estimates and/or variances, but they are not in compatible places, please solve the problem and try again.\n")
       }
     }
     if(!inherits(variances, "matrix")){
@@ -884,7 +916,7 @@ get_letters.emmGrid <- function(x, ...){
 #' 
 #' @param obj An object of class `viztest` produced by the `viztest()` function.
 #' @param type Indicates whether annotations are produced for overlapping intervals that are significantly different from each other or not. The `"auto"` option will
-#' find the type that produces the fewest annotations. 
+#' find the type that produces the fewest annotations. If `type="discrepancies"`, annotations will be made for pairs of estimates whose test results do not correspond with the (non-)overlaps in the confidence intervals. 
 #' @param tol Tolerance for determining whether intervals are close enough to be considered ambiguous.  This also plots significance flags for intervals that 
 #' do not overlap, but the distance between them is smaller than the tolerance.  The default is zero, but increasing the value will potentially produce more significance flags. 
 #' @param nudge A vector of the same length as the number of brackets.  This will nudge the y-position of the brakcet by the indicated amount.  This will be difficult to 
@@ -893,7 +925,20 @@ get_letters.emmGrid <- function(x, ...){
 #' 
 #' @importFrom stats confint
 #' @export
-make_annotations <- function(obj, type = c("auto", "significant", "insignificant"),  tol = 0, nudge=NULL, ...){
+#' @examples
+#' data(chickwts)
+#' chick_mod <- lm(weight ~ feed, data=chickwts)
+#' library(marginaleffects)
+#' chick_preds <- avg_predictions(chick_mod, variables="feed")
+#' b <- coef(chick_preds)
+#' names(b) <- chick_preds$feed
+#' v <- vcov(chick_preds)
+#' chick_vt_data <- make_vt_data(b, v)
+#' chick_vt <- viztest(chick_vt_data, test_level = 0.0001, include_zero=FALSE)
+#' chick_vt
+#' 
+#' make_annotations(chick_vt, type="discrepancies")
+make_annotations <- function(obj, type = c("auto", "significant", "insignificant", "discrepancies"),  tol = 0, nudge=NULL, ...){
   typ <- match.arg(type)
   if(typ == "auto"){
     ns <- make_annotations(obj, type="insignificant", tol=tol, nudge=nudge, ...)
@@ -909,35 +954,68 @@ make_annotations <- function(obj, type = c("auto", "significant", "insignificant
   upr <- obj$est$upr_add
   names(upr) <- obj$est$vbl
   rng <- max(upr) - min(lwr)
-  tmp_combs <- data.frame(
-    smaller = obj$param_names[obj$combs[2,]], 
-    larger = obj$param_names[obj$combs[1,]] 
-  ) %>% 
-    mutate(us = upr[smaller], 
-           ll = lwr[larger],
-           ul = upr[larger], 
-           olap = ll < us) 
-  if(typ == "significant"){
-  tmp_combs <- tmp_combs %>%
-    mutate(s = obj$pw_test, 
-           ambig = ll > us & (ll - us) <= tol) %>% 
-    filter(s & (olap | ambig))
-  }else{
+  if(typ != "discrepancies"){
+    tmp_combs <- data.frame(
+      smaller = obj$param_names[obj$combs[2,]], 
+      larger = obj$param_names[obj$combs[1,]] 
+    ) %>% 
+      mutate(us = upr[smaller], 
+             ll = lwr[larger],
+             ul = upr[larger], 
+             olap = ll < us) 
+    if(typ == "significant"){
     tmp_combs <- tmp_combs %>%
-      mutate(s = !obj$pw_test) %>% 
-      filter(s & olap)
+      mutate(s = obj$pw_test, 
+             ambig = ll > us & (ll - us) <= tol) %>% 
+      filter(s & (olap | ambig))
+    }else{
+      tmp_combs <- tmp_combs %>%
+        mutate(s = !obj$pw_test) %>% 
+        filter(s & olap)
+    }
+    if(is.null(nudge))nudge <- rep(0, nrow(tmp_combs))
+    if(length(nudge) != nrow(tmp_combs)){
+      warning("nudge must be NULL or same length as number of annotations, currently ignored")
+      nudge <- rep(0, nrow(tmp_combs))
+    } 
+    annot_flag <- ifelse(typ == "significant", "*", "NS")
+    list(
+      annotations = rep(annot_flag, nrow(tmp_combs)), 
+      y_position = tmp_combs$ul + .05*rng + nudge, 
+      xmin = tmp_combs$smaller, 
+      xmax = tmp_combs$larger
+    )
+  }else{
+    tab <- obj$tab
+    tab$row <- 1:nrow(tab)
+    use_levs <- tab[which(tab$psame == max(tab$psame)), ]
+    use_row <- use_levs[which.max(use_levs$easy), "row"]
+    tests <- obj$pw_test
+    olaps <- obj$ci_tests[,use_row]
+    discrep <- which(olaps != tests)
+    if(length(discrep) > 0){
+      dcombs <- obj$combs[, discrep, drop=FALSE]
+      tmp_combs <- data.frame(
+        smaller = obj$param_names[obj$combs[2,discrep]], 
+        larger = obj$param_names[obj$combs[1,discrep]] 
+      ) %>% 
+        mutate(ul = upr[larger]) 
+      if(is.null(nudge))nudge <- rep(0, nrow(tmp_combs))
+      if(length(nudge) != nrow(tmp_combs)){
+        warning("nudge must be NULL or same length as number of annotations, nudge being ignored")
+        nudge <- rep(0, nrow(tmp_combs))
+      } 
+      
+      list(
+        annotations = ifelse(tests[discrep], "*", "NS"), 
+        y_position = tmp_combs$ul + .05*rng + nudge, 
+        xmin = tmp_combs$smaller, 
+        xmax = tmp_combs$larger
+      )
+    }else{
+      stop("No discrepancies between pairwise tests and (non-)overlaps in inferential confidence intervals.\n")
+    }
   }
-  if(is.null(nudge))nudge <- rep(0, nrow(tmp_combs))
-  if(length(nudge) != nrow(tmp_combs)){
-    warning("nudge must be NULL or same length as number of annotations, currently ignored")
-    nudge <- rep(0, nrow(tmp_combs))
-  } 
-  annot_flag <- ifelse(typ == "significant", "*", "NS")
-  list(
-    annotations = rep(annot_flag, nrow(tmp_combs)), 
-    y_position = tmp_combs$ul + .05*rng + nudge, 
-    xmin = tmp_combs$smaller, 
-    xmax = tmp_combs$larger
-  )
+  
 }
 

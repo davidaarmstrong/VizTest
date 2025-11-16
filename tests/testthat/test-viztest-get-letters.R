@@ -1,0 +1,11 @@
+test_that("get_letters returns right-length lists and vectors", {
+  mod <- viztest_chick_model()
+  chick_emm <- emmeans::emmeans(mod, "feed")
+  chick_gl <- multcomp::glht(mod, linfct=multcomp::mcp(feed="Tukey"))
+  cl_em <- get_letters(chick_emm)
+  expect_equal(nrow(cl_em), 6)
+  expect_equal(ncol(cl_em), 3)
+  cl_gl <- get_letters(chick_gl, test = multcomp::adjusted('none'))
+  expect_equal(nrow(cl_gl), 6)
+  expect_equal(ncol(cl_gl), 4)
+})

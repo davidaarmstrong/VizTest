@@ -6,7 +6,7 @@
 \usage{
 make_annotations(
   obj,
-  type = c("auto", "significant", "insignificant"),
+  type = c("auto", "significant", "insignificant", "discrepancies"),
   tol = 0,
   nudge = NULL,
   ...
@@ -16,7 +16,7 @@ make_annotations(
 \item{obj}{An object of class \code{viztest} produced by the \code{viztest()} function.}
 
 \item{type}{Indicates whether annotations are produced for overlapping intervals that are significantly different from each other or not. The \code{"auto"} option will
-find the type that produces the fewest annotations.}
+find the type that produces the fewest annotations. If \code{type="discrepancies"}, annotations will be made for pairs of estimates whose test results do not correspond with the (non-)overlaps in the confidence intervals.}
 
 \item{tol}{Tolerance for determining whether intervals are close enough to be considered ambiguous.  This also plots significance flags for intervals that
 do not overlap, but the distance between them is smaller than the tolerance.  The default is zero, but increasing the value will potentially produce more significance flags.}
@@ -29,4 +29,18 @@ specify ahead of time, but can be specified to clean up a plot after an initial 
 \description{
 Makes a list of annotations for significance brakcets produced by the \code{geom_signif()} function from the \code{ggsignif} package.  The annotations are added for
 pairs of estimates whose confidence intervals overlap, but the estimates are nonetheless significantly different from each other.
+}
+\examples{
+data(chickwts)
+chick_mod <- lm(weight ~ feed, data=chickwts)
+library(marginaleffects)
+chick_preds <- avg_predictions(chick_mod, variables="feed")
+b <- coef(chick_preds)
+names(b) <- chick_preds$feed
+v <- vcov(chick_preds)
+chick_vt_data <- make_vt_data(b, v)
+chick_vt <- viztest(chick_vt_data, test_level = 0.0001, include_zero=FALSE)
+chick_vt
+
+make_annotations(chick_vt, type="discrepancies")
 }
