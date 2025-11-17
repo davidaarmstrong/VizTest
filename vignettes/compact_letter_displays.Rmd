@@ -40,7 +40,7 @@ library(multcomp)
 chick_gl <- glht(chick_mod, linfct=mcp(feed = "Tukey"))
 ```
 
-The function `get_letters()` is in the \CRANpkg{VizTest} pacakge and will generate the compact letter display matrix from the pairwise comparisons. 
+The function `get_letters()` is in the \CRANpkg{VizTest} package and will generate the compact letter display matrix from the pairwise comparisons. 
 
 ```{r}
 lmat_gl <- get_letters(chick_gl, test=adjusted(type="none"))
@@ -66,7 +66,7 @@ names(chick_b) <- chick_preds$feed
 lmat_df <- get_letters(list(est=chick_b, var=vcov(chick_preds)), adjust="none")
 lmat_df
 ```
-Now that we have the letter matrices, we can make the plots.  The `letter_plot()` function takes two arguments: a data frame with columns `x` (the grouping variable) and `predicted` (the predicted values), and the letter matrix.  We first prepare the data frame of predictions.  We need to rename the relevant variables first
+Now that we have the letter matrices, we can make the plots.  The `letter_plot()` function takes two arguments: a data frame with columns `x` (the grouping variable) and `predicted` (the predicted values), and the letter matrix.  We first prepare the data frame of predictions.  We need to rename the relevant variables first.
 
 ```{r}
 
@@ -76,7 +76,7 @@ chick_preds_dat <- chick_preds %>%
   rename(x = feed, predicted=estimate)
 ```
 
-Finally, we can make the figure
+Finally, we can make the figure.
 
 
 ```{r chick-letter, fig.width=6, fig.height=4, fig.align="center", fig.cap="Predicted chick weights by feed type with 95% confidence intervals and a compact letter display"}
@@ -89,7 +89,7 @@ The figure shows that `horsebean` is different from all other feed types because
 
 ## Ornstein Data
 
-The Ornstein data in the \CRANpkg{carData} package contains measures of the assets of ten different sectors in four different nations along with the number of interlocking director and executive positions shared with other firms.  We estimate a generalized linear model model of interlocks as a function of assets, sector and nation.  We then generate predictions for nation and make the letter display. 
+The Ornstein data in the \CRANpkg{carData} package contains measures of the assets of ten different sectors in four different nations along with the number of interlocking director and executive positions shared with other firms.  We estimate a generalized linear model of interlocks as a function of assets, sector and nation.  We then generate predictions for nation and make the letter display. 
 
 ```{r}
 ## Load Data
