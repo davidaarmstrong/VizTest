@@ -22,7 +22,7 @@ Significance brackets are lines or brackets that connect two estimates with a no
 
 1. Non-overlapping: non-overlapping intrevals indicate a significant difference between the two estimates. 
 2. Overlapping, but Significant: in some cases, estimates with overlapping intervals can nonetheless be significantly different from each other.  The amount of overlap is not necessarily indicative of a difference or not - that depends on the standard errors and covariance of the estimates. 
-3. Overlapping and Not Significant: in other cases, esitmates with overlapping confidence intervals are not significantly different from each other.  
+3. Overlapping and Not Significant: in other cases, estimates with overlapping confidence intervals are not significantly different from each other.  
 
 We propose that significance brackets could be used to identify either the second or third groups.  First, no significance brackets are needed for intervals that do not overlap, their significance is obvious.  So, significance brackets only need to be used on pairs of estimates with overlapping intervals.  To minimize visual clutter, we could flag overlapping pairs of intervals that are statistically significantly different from each other noting that all un-flagged pairs are not statistically different from each other. Likewise, the converse could be done - flagging insignificant differences and noting that all other overlapping pairs are significant.  The idea would be to use whichever approach generates fewer intervals.  That said, even this method does not scale particularly well as the number of intervals gets large.  We demonstrate this idea on several examples below. 
 
@@ -38,7 +38,7 @@ chickwts$feed <- reorder(chickwts$feed,
 chick_mod <- lm(weight~ feed, data=chickwts)
 ```
 
-In the \CRANpkg{VizTest} package, we have a function called `make_annotations()` that makes a list of annotations amenable for use in `geom_signif()` from the \CRANpkg{ggsignif} package. First, the user must executive the `viztest()` function on the estimates. 
+In the \CRANpkg{VizTest} package, we have a function called `make_annotations()` that makes a list of annotations amenable for use in `geom_signif()` from the \CRANpkg{ggsignif} package. First, the user must execute the `viztest()` function on the estimates. 
 
 ```{r}
 library(marginaleffects)
@@ -83,7 +83,7 @@ ggplot(chick_preds, aes(x=feed, y=estimate)) +
 
 ## Ornstein Data
 
-The Ornstein data in the \CRANpkg{carData} package contains measures of the assets of ten different sectors in four different nations along with the number of interlocking director and executive positions shared with other firms.  We estimate a generalized linear model model of interlocks as a function of assets, sector and nation.  We then generate predictions for nation and make the letter display. 
+The Ornstein data in the \CRANpkg{carData} package contains measures of the assets of ten different sectors in four different nations along with the number of interlocking director and executive positions shared with other firms.  We estimate a generalized linear model of interlocks as a function of assets, sector and nation.  We then generate predictions for nation and make the letter display. 
 
 ```{r}
 ## Load Data
@@ -114,7 +114,7 @@ ggplot(orn_preds, aes(x=sector, y=estimate)) +
   theme_bw()
 ```
 
-Sometimes, particularly when there are more than a few estiamtes, the y-position of the annotations will need a bit of nudging to make the gaps between brackets more visually appealing.  This can be done either by directly adjusting the `y_position` element of the annotations list or by using the `nudge` argument in the call to `make_annotations()`.  To do the latter, normally you would need to use some trial and error to ensure the right amount of nudging is applied.  The call to `make_annotations()` below is the result of such trial and error.  
+Sometimes, particularly when there are more than a few estimates, the y-position of the annotations will need a bit of nudging to make the gaps between brackets more visually appealing.  This can be done either by directly adjusting the `y_position` element of the annotations list or by using the `nudge` argument in the call to `make_annotations()`.  To do the latter, you would need to use some trial and error to ensure the right amount of nudging is applied.  The call to `make_annotations()` below is the result of such trial and error.  
 
 ```{r orn-annot2, fig.height=6, fig.width=6, out.width="75%", fig.align="center", fig.cap="Predicted Number of Interlocks by Sector with 95% Confidence Intervals and Nudged Significance Brackets."}
 orn_annots <- make_annotations(orn_vt, adjust="none", 
