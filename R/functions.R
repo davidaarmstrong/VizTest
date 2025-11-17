@@ -624,7 +624,8 @@ plot.viztest <- function(x,
                          overall_theme = theme_bw,
                          theme_arg = list(legend.position="top", 
                                           plot.caption = element_textbox_simple(width = unit(1, "npc"),  # Wraps to plot width
-                                                                                halign = 0)),
+                                                                                halign = 0,
+                                                                                margin = ggplot2::margin(1, 0, 0, 0,"lines"))),# Prevents overlap of caption and x-axis title
                          remove_caption=FALSE){
   inp <- x$est
   tmp <- x$tab[which(x$tab$psame == max(x$tab$psame)), ]
