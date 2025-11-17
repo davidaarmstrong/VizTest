@@ -40,8 +40,8 @@ library(dplyr)
 library(tidyr)
 ```
 
-The `viztest()` function in the `VizTest` pacakge will calculate all pairwise tests using normal theory tests (potentially adjusted for multiplicity if the user elects to do so).  We image there are
-use cases where users derive the significance of differences using some procedure that is not anticipated by the workflow in the package.  We give users who do this the option to input a vector indicating which pairs are significantly different with the `sig_diffs` argument.  This gets somewhat complex, though so we walk through an example below.  Consider the following regression model: 
+The `viztest()` function in the `VizTest` pacakge will calculate all pairwise tests using normal theory tests (potentially adjusted for multiplicity if the user elects to do so).  We imagine there are
+use cases where users derive the significance of differences using some procedure that is not anticipated by the workflow in the package.  We give users who do this the option to input a vector indicating which pairs are significantly different with the `sig_diffs` argument.  This gets somewhat complex, though, so we walk through an example below.  Consider the following regression model: 
 
 ```{r}
 library(VizTest)
@@ -63,7 +63,7 @@ model1 <- glm(cbind(ncases, ncontrols) ~ agegp + tobgp + alcgp,
 preds <- avg_predictions(model1, variables = "tobgp")
 ```
 
-Let's imagine, for the sake of argument that I had a different way of identifying whether there are significant differences between the estimates presented above.  I could use `make_diff_template()` to create a template for inputting these differences.  Note that this also taked `include_intercept` and `include_zero` logical arguments that must be the same as the ones you will specify in `viztest()`.  Let'see how it works.  The first thing we need to do is make a vector of the estimates and apply the appropriate names: 
+Let's imagine, for the sake of argument that we had a different way of identifying whether there are significant differences between the estimates presented above.  We could use `make_diff_template()` to create a template for inputting these differences.  Note that this also taked `include_intercept` and `include_zero` logical arguments that must be the same as the ones you will specify in `viztest()`.  Let'see how it works.  The first thing we need to do is make a vector of the estimates and apply the appropriate names: 
 
 ```{r}
 ests <- preds$estimate
