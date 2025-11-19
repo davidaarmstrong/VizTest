@@ -598,7 +598,7 @@ make_segs <- function(.data, vdt = .02, ...){
 #' * `ambiguous` - Logical vector indicating whether the comparison is considered "ambiguous". 
 #' @method plot viztest
 #' @importFrom dplyr left_join arrange `%>%` join_by
-#' @importFrom ggplot2 ggplot geom_pointrange geom_segment aes labs geom_point geom_linerange unit theme_bw scale_color_manual scale_linewidth_manual theme
+#' @importFrom ggplot2 ggplot geom_pointrange geom_segment aes labs geom_point geom_linerange unit theme_bw scale_color_manual scale_linewidth_manual theme margin
 #' @importFrom ggtext element_textbox_simple
 #' @examples
 #' data(mtcars)
@@ -625,7 +625,7 @@ plot.viztest <- function(x,
                          theme_arg = list(legend.position="top", 
                                           plot.caption = element_textbox_simple(width = unit(1, "npc"),  # Wraps to plot width
                                                                                 halign = 0,
-                                                                                margin = ggplot2::margin(1, 0, 0, 0,"lines"))),# Prevents overlap of caption and x-axis title
+                                                                                margin = margin(1, 0, 0, 0,"lines"))),# Prevents overlap of caption and x-axis title
                          remove_caption=FALSE){
   inp <- x$est
   tmp <- x$tab[which(x$tab$psame == max(x$tab$psame)), ]

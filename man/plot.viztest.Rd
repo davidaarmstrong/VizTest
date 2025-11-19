@@ -21,7 +21,7 @@
   scale_color_args = list(values = c("gray75", "black")),
   overall_theme = theme_bw,
   theme_arg = list(legend.position = "top", plot.caption = element_textbox_simple(width =
-    unit(1, "npc"), halign = 0)),
+    unit(1, "npc"), halign = 0, margin = margin(1, 0, 0, 0, "lines"))),
   remove_caption = FALSE
 )
 }
