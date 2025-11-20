@@ -33,6 +33,8 @@ Suggests:
     sandwich,
     testthat (>= 3.0.0),
     wooldridge
+Remotes: 
+    davidaarmstrong/psre
 VignetteBuilder: knitr
 License: MIT + file LICENSE
 Encoding: UTF-8
