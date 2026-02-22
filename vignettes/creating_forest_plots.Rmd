@@ -1,0 +1,340 @@
+---
+title: "Creating Forest Plots"
+author:  
+  - name: William Poirier
+    affiliation: Western University
+    address:
+    - Department of Political Science
+    - London, Canada
+    url: https://williampo1.github.io/
+    orcid: 0000-0002-3274-1351
+    email:  wpoirier@uwo.ca
+  - name: David A. Armstrong
+    affiliation:
+    - Western University
+    address:
+    - Department of Political Science
+    - London, Canada
+    email: dave.armstrong@uwo.ca
+date: "`r Sys.Date()`"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Creating Forest Plots}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>", 
+  message = FALSE, 
+  warning=FALSE
+)
+```
+
+Most of the forest plotting functions in R are built to be general(ish), but they do not anticipate wanting to plot two different confidence intervals for each estimate.  Some of them, like `forestploter::forest` and `forestplot::forestplot` can be made to do this, but it takes a bit of hacking to get there.  In an effort to make it easier to plot forests with our two sets of confidence intervals, we wrote a function called `gg_forest()` which constucts a table panel and a plot panel and uses `patchwork` to put them together in a coherent fashion. Many features of the underlying machinery are exposed in `gg_forest`, but the function itself relies on some `geom_` and `scale_` functions that are part of `VizTest`.  This vignette will show some basic use cases of these tools. 
+
+## The Data
+
+The input data for `gg_forest` (and the underlying `geom_` functions) should be organized in a data frame.  It should have columns for estimates, standard lower and upper confidence intervals (e.g., 95 percent) and optionally inferential confidence intervals.  While the inferential confidence intervals are optional, we built these functions to work with those intervals alongside the standard intervals.  If you want a standard forest plot with only one set of intervals, it is likely that other packages, like those mentioned above, may provide more customization options.  In addition to the estimates and intervals, if a summary row (or rows) exists, then there should be a logical variable indicating which rows are the summary - generally you'll want to print those at the bottom.  The data frame should also have a variable that indicates the character expansion for the point sizes.  We will show a couple of examples with the built-in `esoph` data from the `datasets` package.  We will use the `emmeans` package to make predictions from the model to plot. 
+
+First, we can load the data, we will change `age` into an unordered factor and then run two different models one with age as a covariate and a null model to generate the overall summary.  
+
+```{r}
+library(emmeans)
+library(VizTest)
+library(dplyr)
+data(esoph)
+esoph$age <- factor(as.character(esoph$age), 
+                        levels=c("25-34", "35-44", "45-54", "55-64", "65-74", "75+"))
+model1 <- glm(cbind(ncases, ncontrols) ~ age,
+              data = esoph, family = binomial())
+model_sum <- glm(cbind(ncases, ncontrols) ~ 1,
+              data = esoph, family = binomial())
+```
+
+We can use `emmeans` to generate predictions and confidence intervals for each age group and save them in the data frame called `fit`. 
+
+```{r}
+em <- emmeans(model1, "age")
+fit <- print(em)
+```
+
+To get the inferential confidence intervals, we can execute `viztest()` on the `emmeans` object.  We can use `get_viztest_level()` to pull the confidence level associated with the easiest tests to decipher. 
+
+```{r}
+vt <- viztest(em, test_level = .05)
+vt
+ic_level <- get_viztest_levels(vt, "easiest")
+```
+
+Next, we can use `confint()` to get the standard and inferential confidence intervals and transform the predictions into the odds ratio scale. 
+
+```{r}
+fit$or <- exp(fit$emmean)
+fit$lower <- exp(fit$asymp.LCL)
+fit$upper <- exp(fit$asymp.UCL)
+ag_data <- aggregate(esoph[,c("ncases", "ncontrols")], list(age = esoph$age), \(x)as.integer(sum(x)))
+fit$n_cases <- ag_data$ncases
+fit$n_controls <- ag_data$ncontrols
+fit_ci <- confint(em, level = ic_level)
+fit$lower_ici <- exp(fit_ci$asymp.LCL)
+fit$upper_ici <- exp(fit_ci$asymp.UCL)
+```
+
+Now, we can do the same for the summary data.  Here we simply generate a prediction
+for the model with `predict()` and confidence intervals using `confint()`.  We do not need
+to make visual testing intervals for the summary value.  
+
+
+```{r}
+pred_sum <- predict(model_sum, type="link", se.fit=TRUE)
+ci_sum <- confint(model_sum)
+fit_sum <- data.frame(
+  age = "Summary", 
+  emmean = pred_sum$fit[1],
+  SE = pred_sum$se.fit[1],
+  asymp.LCL = ci_sum[1], 
+  asymp.UCL = ci_sum[2],
+  or = exp(pred_sum$fit[1]),
+  lower = exp(ci_sum[1]),
+  upper = exp(ci_sum[2]), 
+  n_cases =sum(ag_data$ncases), 
+  n_controls = sum(ag_data$ncontrols), 
+  lower_ici = NA, 
+  upper_ici = NA
+)
+```
+
+We can then put the data together in the same place. 
+
+```{r}
+fit <- rbind(fit[,-4], #remove df column
+      fit_sum) 
+
+# add row_number indicator for later. 
+fit$row_number <- 1:nrow(fit)
+```
+
+Now, there are some other variables we can add since the data are all in the same place.  We need to add a logical flag for the summary row(s), a point_size scaling variable, which we will set to the inverse of the sampling variance estimate and a label variable that puts the stimuli in the right order. Sometimes, we may want to reorder the rows based on the value of the odds ratio.  In those cases, you could use `reorder_forest()` for this.  It works like `reorder()`, but it forces the summary row to be in the right place.  In this case, since the age levels are already ordered in a useful way, we just want to reverse the values so 25 has the highest value (it will plot at the top) and Summary has the smallest value (it will plot at the bottom). 
+
+```{r}
+fit$is_summary <- fit$age == "Summary"
+fit$point_size <- 1/fit$SE^2
+fit$age_label <- factor(fit$age, levels=rev(fit$age))
+```
+
+The `fit` object now has all the relevant data to make a forest plot.
+
+## Forest Plots using `gg_forest()`. 
+
+We first show how to do this with the `gg_forest()` wrapper.  We will show the function first and then explain its arguments. 
+
+```{r}
+out <- gg_forest(fit, 
+                 y = "age_label", 
+                 x = "or", 
+                 xmin_std = "lower", 
+                 xmax_std = "upper", 
+                 xmin_ici = "lower_ici", 
+                 xmax_ici = "upper_ici",
+                 vline = 1, 
+                 size_prop = "point_size", 
+                 is_summary = "is_summary", 
+                 use_log_scale = TRUE, 
+                 data_cols = c("Age" = "age_label", "Controls" = "n_controls", "Cases"="n_cases", "OR" = "or"), 
+                 max_size=5,
+                 table_header_size = 16, 
+                 table_text_size = 5, 
+                 col_nudge=c(-.15, 0,0,0), 
+                 diamond_aspect=15, 
+                 diamond_row_frac = 2)
+```
+
+The first argument is the data.  The names of the y-variable (the labelled indicator for the rows) and the other variables are in quotes.  The `_std` variables are the standard confidence intervals and the `_ici` variables are the inferential confidence intervals.  The `size_prop` variable is the variable that will be used to scale the point sizes.  The `is_summary` variable is a logical variable indicating which rows are summary rows.  The `use_log_scale` argument indicates whether to use a log scale for the x-axis, which is common for odds ratios.  The `data_cols` argument takes a named vector of column names to be printed in the table panel and the corresponding variables in the data frame.  The `max_size` argument sets the maximum size for the points.  The `table_header_size` and `table_text_size` arguments set the font size for the table header and text, respectively.  The `col_nudge` argument takes a vector of horizontal nudges for each column in the table to adjust their position.  We use this for the first column which is left-aligned.  In this case, the cell text aligns left with the anchor as the tick mark location.  The header label is set centered over the tick mark regardless of the justification of the text.  The `col_nudge` parameter allows you to move the cell text to be roughly in line with the header label.  It may take a bit of trial and error to get it just right.  Finally, the `diamond_aspect` and `diamond_row_frac` arguments control the aspect ratio and row fraction for summary rows, which are plotted as diamonds instead of points.  If the summary diamond is too flat, increase `diamond_aspect`.  The `diamond_row_frac` argument is intended to make is so that the diamond never spills over into another row.  
+
+The `out` object now contains two elements - a table and a plot.  We can use the plot method to put them together, which is really just a call to `patchwork` functions. 
+
+```{r, out.width="100%", fig.height=6, fig.width=9, fig.align="center", fig.cap="Forest Plot with Standard (95%) and Inferential (75%) Confidence Intervals.  The standard confidence intervals are the thin lines and the inferential confidence intervals are the thick lines.  See Armstrong and Poirier (2025) for more details on inferential confidence intervals."}
+plot(out)
+```
+
+## Using Individual `geom_` Functions. 
+
+The `gg_forest()` function is a wrapper that makes it easy to put together a forest plot with two sets of confidence intervals, but the underlying machinery is built on `ggplot2` geoms and scales that are part of the `VizTest` package.  If you want more control over the aesthetics, you can use those functions directly.  
+
+Let's make the figure first. We can make confidence bounds with `ggplot2`'s `geom_linerange()` using different line widths.  We made a utility - `geom_foreststripe()` which will make a striped figure that could match striping in the table if you use it. The striping should be added before you add other elements.  The points are added with `geom_forestpoint()` the main utility of this function is that it plots the summary and non-summary dots as different shapes and the size argument works differently.  The summary diamonds are as wide as the confidence bounds and the non-summary points are scaled proportional to the `size_prop` variable.  We use other `ggplot2` functions to add vertical lines, re-scale the x-axis and adjust the maximum size of the points.  
+
+```{r fig.height=6, fig.width=6, fig.align="center", out.width="65%", fig.cap="Forest Plot with Standard (95%) and Inferential (75%) Confidence Intervals.  The standard confidence intervals are the thin lines and the inferential confidence intervals are the thick lines.  See Armstrong and Poirier (2025) for more details on inferential confidence intervals."}
+library(ggplot2)
+g <- ggplot(fit, aes(y=age_label, x=or)) + 
+  geom_foreststripe(n_cols=NULL, start = 3) + 
+  geom_linerange(aes(xmin = lower, xmax=upper, color="Standard CI"), linewidth=1) + 
+  geom_linerange(aes(xmin=lower_ici, xmax=upper_ici, color="Inferential CI"), linewidth=5) + 
+  geom_forestpoint(aes(is_summary = is_summary, size=point_size, xmin = lower, xmax=upper), fill="black", 
+                   diamond_aspect=10, diamond_row_frac = .9) + 
+  theme_classic() + 
+  scale_color_manual(values=c("gray60", "black")) + 
+  scale_x_log10() + 
+  geom_vline(xintercept = 1, linetype="dashed") + 
+  labs(x = "Odds Ratio", y="", colour="") + 
+  scale_size_area(max_size=5) + 
+  guides(size = "none")
+g
+```
+To make this compatible with the table, we will also need to remove the y-axis ticks and labels. 
+
+```{r}
+g <- g + 
+  theme(axis.ticks.y = element_blank(), 
+        axis.text.y = element_blank(), 
+        axis.line.y=element_blank())
+```
+
+Next, we can make the table. For this, we can use `geom_foresttable()` a function from this package.  Again, we will make the table and then discuss the arguments. 
+
+```{r fig.height=6, fig.width=6, fig.align="center", out.width="65%", fig.cap="Data Table for Forest Plot."}
+data_cols <- c("Age" = "age_label", "Controls" = "n_controls", "Cases"="n_cases", "OR" = "or")
+tab <- ggplot(fit, aes(y=age_label)) + 
+  geom_foreststripe(n_cols=length(data_cols), start=3) +
+  geom_foresttable(
+    cols = data_cols,
+    col_nudge = c(-.15, 0, 0, 0), 
+    fmt = list(
+      age_label = as.character, 
+      n_controls = function(x)sprintf("%d",x), 
+      n_cases = function(x)sprintf("%d",x), 
+      or = function(x)sprintf("%.2f",x)
+    ), 
+    col_align = c("left", "center", "center", "center"),
+    size = 4
+  ) +
+  scale_x_foresttable(data_cols, names(data_cols),
+                      col_gap = 1) +   # returns list(scale, theme) — ggplot2 handles lists fine
+  theme_void() +
+  theme(
+    axis.text.x.top   = element_text(face = "bold", size = 16, margin = margin(t = 8)),
+    axis.line.x.top   = element_blank(),
+    axis.ticks.x.top  = element_blank(),
+    axis.ticks.length = unit(0, "pt")
+  )
+tab
+```
+
+In the code above, you we start with a `ggplot` with just the `y` aesthetic.  This should be the same `y` variable as in the figure.  We add striping in the same way.  We can specify `n_cols` to let the function know that there are four columns of data to stripe.  The `data_cols` is a named vector of values.  The values are variable names and the names of the vector are what will be printed in the table header row.  The `col_nudge` argument takes a vector of horizontal nudges for each column in the table to adjust their position.  We use this for the first column which is left-aligned as described above. The `fmt` argument takes a list of functions that format each variable for printing.  The names of the list should be the same as the variable names in `data_cols`.  I've used `sprintf()` here, but `format()` would work as well.  In fact, any function that could be called on the values to render them to print would work.  The `col_align` argument takes a vector of justifications for each column.  Finally, we use `scale_x_foresttable()` to set the header labels and adjust the gap between columns with `col_gap`.  We end with some theming that turns off elements that we do not need.  
+
+We could put these two elements together with `patchwork`: 
+
+```{r, out.width="100%", fig.height=6, fig.width=9, fig.align="center", fig.cap="Forest Plot with Data Table.  The left panel is the data table and the right panel is the forest plot.  The striping matches across panels."}
+library(patchwork)
+(tab + g + plot_layout(widths = c(1.25, 1), guides = "collect")) & theme(legend.position="bottom")
+```
+
+
+## Subgroup Analysis 
+
+Since these are just made with `ggplot`, in principle, there are a couple of ways that subgroup analysis could be done.  First, it would be trivial to make these two different plots for models built on subsets of the data.  Alternatively, you could build a single model with interactions and then subset the data once it is made and make two different plots.  That is likelyt he easiest way and we will not pursue that more here.  
+
+Another option, would be to use the custom syntax we propose above and add grouping variables.  For example, using the `esoph` data imagine we wanted to look at instances by age-group for high and low tobacco usage groups.  We will pull the data together much in the same way that we did above. 
+
+```{r}
+data(esoph)
+esoph <- subset(esoph, agegp != "25-34")
+esoph$agegp <- factor(as.character(esoph$agegp), 
+                        levels=c("25-34", "35-44", "45-54", "55-64", "65-74", "75+"))
+esoph$high_tob <- ifelse(esoph$tobgp %in% c("20-29", "30+"), "High Tobacco", "Low Tobacco")
+esoph$high_tob <- factor(esoph$high_tob, levels=c("Low Tobacco", "High Tobacco"))
+model1 <- glm(cbind(ncases, ncontrols) ~ agegp*high_tob,
+              data = esoph, family = binomial())
+model_sum <- glm(cbind(ncases, ncontrols) ~ high_tob,
+              data = esoph, family = binomial())
+em <- emmeans(model1, c("agegp", "high_tob"))
+em_sum <- emmeans(model_sum, "high_tob")
+fit <- print(em)
+fit_sum <- print(em_sum)
+fit_sum$agegp <- "Summary"
+fit_sum$lower_ici <- fit_sum$upper_ici <- NA
+ag_data <- aggregate(esoph[,c("ncases", "ncontrols")], list(high_tob = esoph$high_tob), \(x)as.integer(sum(x)))
+fit_sum$n_cases <- ag_data$ncases
+fit_sum$n_controls <- ag_data$ncontrols
+
+vt <- viztest(em, include_zero = FALSE, test_level = .05)
+vt
+ic_level <- get_viztest_levels(vt, "easiest")
+fit_ci <- confint(em, level = ic_level)
+fit$lower_ici <- exp(fit_ci$asymp.LCL)
+fit$upper_ici <- exp(fit_ci$asymp.UCL)
+ag_data <- aggregate(esoph[,c("ncases", "ncontrols")], list(age = esoph$age, high_tob = esoph$high_tob), \(x)as.integer(sum(x)))
+fit$n_cases <- ag_data$ncases
+fit$n_controls <- ag_data$ncontrols
+fit <- rbind(fit, fit_sum)
+fit$or <- exp(fit$emmean)
+fit$lower <- exp(fit$asymp.LCL)
+fit$upper <- exp(fit$asymp.UCL)
+fit$is_summary  <- fit$agegp == "Summary"
+fit$point_size <- 1/fit$SE^2
+fit <- fit[order(fit$agegp, fit$high_tob), ]
+fit$row <- 1:nrow(fit)
+fit$row_fac <- as.factor(1:nrow(fit))
+fit$row_fac <- reorder_forest(fit$row_fac, fit$row)
+```
+
+
+```{r fig.height=6, fig.width=6, fig.align="center", out.width="65%", fig.cap="Forest Plot with Standard (95%) and Inferential (83%) Confidence Intervals.  The standard confidence intervals are the thin lines and the inferential confidence intervals are the thick lines.  See Armstrong and Poirier (2025) for more details on inferential confidence intervals."}
+g <- ggplot(fit, aes(y=row_fac, x=or)) + 
+  geom_foreststripe(n_cols=NULL, start = 3) + 
+  geom_linerange(aes(xmin = lower, xmax=upper, color = high_tob, alpha="Standard CI"), linewidth=1) + 
+  geom_linerange(aes(xmin=lower_ici, xmax=upper_ici, color=high_tob, alpha= "Inferential CI"), linewidth=5) + 
+  geom_forestpoint(aes(is_summary = is_summary, size=point_size, xmin = lower, xmax=upper, color=high_tob, fill=high_tob), 
+                   diamond_aspect=10, diamond_row_frac = .9) + 
+  theme_classic() + 
+  scale_alpha_manual(values=c(.25, .75)) +
+  scale_x_log10() + 
+  geom_vline(xintercept = 1, linetype="dashed") + 
+  labs(x = "Odds Ratio", y="", alpha="") + 
+  scale_size_area(max_size=5) + 
+  guides(size = "none", color="none", fill="none") + 
+  theme(axis.ticks.y = element_blank(), 
+        axis.text.y = element_blank(), 
+        axis.line.y=element_blank())
+g
+```
+
+Next, we can make the table. Because these work in th ggplot ecosystem, you can color the text by a variable if you like.  Here, we color the text by the tobacco usage group.  We can do this simply by adding a color aesthetic to `geom_foresttable()`.  
+
+```{r fig.height=6, fig.width=6, fig.align="center", out.width="65%", fig.cap="Data Table for Forest Plot with Subgroups."}
+data_cols = c("Age" = "agegp", "Tobacco\nUsage" = "high_tob", "Controls" = "n_controls", "Cases"="n_cases", "OR" = "or")
+tab <- ggplot(fit, aes(y=row_fac, x=or)) + 
+  geom_foreststripe(n_cols=length(data_cols), start=3) +
+  geom_foresttable(aes(color=high_tob), 
+    cols = data_cols,
+    col_nudge = c(-.15, -.35, 0, 0, 0), 
+    fmt = list(
+      agegp = as.character, 
+      high_tob = as.character,
+      n_controls = function(x)sprintf("%d",x), 
+      n_cases = function(x)sprintf("%d",x), 
+      or = function(x)sprintf("%.2f",x)
+    ), 
+    col_align = c("left", "left", "center", "center", "center"),
+    size = 4
+  ) +
+  scale_x_foresttable(data_cols, names(data_cols),
+                      col_gap = 1) +   # returns list(scale, theme) — ggplot2 handles lists fine
+  theme_void() +
+  theme(
+    axis.text.x.top   = element_text(face = "bold", size = 12, margin = margin(t = 8)),
+    axis.line.x.top   = element_blank(),
+    axis.ticks.x.top  = element_blank(),
+    axis.ticks.length = unit(0, "pt")
+  )
+tab
+```
+
+And now putting them together. 
+
+```{r, out.width="100%", fig.height=6, fig.width=9, fig.align="center", fig.cap="Forest Plot with Data Table with Subgroups.  The left panel is the data table and the right panel is the forest plot.  The striping matches across panels."}
+library(patchwork)
+(tab + g + plot_layout(widths = c(1.25, 1), guides = "collect")) & theme(legend.position="bottom")
+```
