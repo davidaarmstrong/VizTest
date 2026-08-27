@@ -1112,6 +1112,10 @@ reorder_forest <- function(x, bvar, fn = mean,
 #'
 #' @return A ggplot2 layer object that can be added to a plot.
 #'
+#' @examples
+#' # geom_forestpoint() is designed to be used as part of gg_forest().
+#' # See ?gg_forest for a complete runnable example.
+#'
 #' @importFrom ggplot2 layer
 #' @importFrom ggplot2 Geom
 #' @importFrom grid grobTree polygonGrob rectGrob
@@ -1307,11 +1311,15 @@ GeomForestPoint <- ggplot2::ggproto(
 #'
 #' @return A ggplot2 layer object that can be added to a plot.
 #'
+#' @examples
+#' # geom_foresttable() is designed to be used as part of gg_forest().
+#' # See ?gg_forest for a complete runnable example.
+#'
 #' @seealso
 #' scale_x_foresttable(), gg_forest()
 #'
 #' @importFrom ggplot2 layer aes ggproto GeomText
-#' @importFrom stats setNames 
+#' @importFrom stats setNames
 #' @importFrom utils modifyList
 #' @export
 geom_foresttable <- function(mapping     = NULL,
@@ -1568,6 +1576,10 @@ scale_x_foresttable <- function(cols,
 #' xmin/xmax aesthetics.
 #'
 #' @return A ggplot2 layer object that can be added to a plot.
+#'
+#' @examples
+#' # geom_foreststripe() is designed to be used as part of gg_forest().
+#' # See ?gg_forest for a complete runnable example.
 #'
 #' @seealso
 #' geom_foresttable(), geom_forestpoint(), gg_forest()

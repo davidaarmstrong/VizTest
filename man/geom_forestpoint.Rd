@@ -76,4 +76,9 @@ For summary rows, the diamond width is determined by the supplied confidence
 interval (\code{xmin}/\code{xmax}), and the height is computed as a bounded function of
 that width. The diamond height \strong{does not} use the \code{size} aesthetic.
 }
+\examples{
+# geom_forestpoint() is designed to be used as part of gg_forest().
+# See ?gg_forest for a complete runnable example.
+
+}
 \keyword{datasets}
