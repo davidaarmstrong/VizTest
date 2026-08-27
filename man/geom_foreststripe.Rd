@@ -75,6 +75,11 @@ Horizontal extents are derived from the panel x range, allowing the stripes to
 span both table columns and forest-plot panels without requiring explicit
 xmin/xmax aesthetics.
 }
+\examples{
+# geom_foreststripe() is designed to be used as part of gg_forest().
+# See ?gg_forest for a complete runnable example.
+
+}
 \seealso{
 geom_foresttable(), geom_forestpoint(), gg_forest()
 }

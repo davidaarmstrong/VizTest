@@ -90,6 +90,11 @@ simple.
 Column positions are computed as \code{seq_along(cols) * col_gap + col_nudge}.
 Horizontal justification is determined by \code{col_align} (left/center/right).
 }
+\examples{
+# geom_foresttable() is designed to be used as part of gg_forest().
+# See ?gg_forest for a complete runnable example.
+
+}
 \seealso{
 scale_x_foresttable(), gg_forest()
 }
